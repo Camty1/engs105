@@ -1,7 +1,11 @@
-all: prog
+FC = gfortran
+OBJs = solve.o hw1.o
 
-prog:
-	gfortran hw1.f -o hw1.o
+hw1: $(OBJs)
+	$(FC) -o -g $@ $^
+
+%.o: %.f
+	$(FC) -c $<
 
 clean:
-	rm -rf *.o
+	rm -rf *.o *.mod hw1

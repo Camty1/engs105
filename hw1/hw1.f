@@ -1,38 +1,38 @@
-        FUNCTION bc(k, I0, sigma, R, theta) RESULT(f)
+        SUBROUTINE bc(k, I0, sigma, R, theta, f)
                 INTEGER, INTENT(IN) :: k
                 REAL, INTENT(IN) :: I0, sigma, R, theta
-                REAL :: f
+                REAL, INTENT(OUT) :: f
 
                 f = -I0 / sigma * R * COS(k * theta)
-        END FUNCTION
+        END SUBROUTINE
 
-        FUNCTION get_A(r, delta_r) RESULT(A)
+        SUBROUTINE get_A(r, delta_r, A)
                 REAL, INTENT(IN) :: r, delta_r
-                REAL :: A
+                REAL, INTENT(OUT) :: A
 
                 A = (1/r)*(1/(2*delta_r)) + (1/delta_r**2)
-        END FUNCTION
+        END SUBROUTINE
 
-        FUNCTION get_B(r, delta_r) RESULT(B)
+        SUBROUTINE get_B(r, delta_r, B)
                 REAL, INTENT(IN) :: r, delta_r
-                REAL :: B
+                REAL, INTENT(OUT) :: B
 
                 B = -(1/r) * (1/(2*delta_r)) + (1/delta_r**2)
-        END FUNCTION
+        END SUBROUTINE
 
-        FUNCTION get_C(r, delta_r, delta_theta) RESULT(C)
+        SUBROUTINE get_C(r, delta_r, delta_theta, C)
                 REAL, INTENT(IN) :: r, delta_r, delta_theta
-                REAL :: C
+                REAL, INTENT(OUT) :: C
                 
                 C = -2*(1/delta_r**2 + 1/(r**2 * delta_theta**2))
-        END FUNCTION
+        END SUBROUTINE
 
-        FUNCTION get_D(r, delta_theta) RESULT(D)
+        SUBROUTINE get_D(r, delta_theta, D)
                 REAL, INTENT(IN) :: r, delta_theta
-                REAL :: D
+                REAL, INTENT(OUT) :: D
 
                 D = 1/(r**2 * delta_theta**2)
-        END FUNCTION
+        END SUBROUTINE
         
         SUBROUTINE linspace(x_min, x_max, num_points, arr)
                 REAL, INTENT(IN) :: x_min, x_max
@@ -53,26 +53,16 @@
                 x = r * COS(theta)
                 y = r * SIN(theta)
         END SUBROUTINE 
+        
+        SUBROUTINE mode2_index_map(row, col, width, new_col)
+                INTEGER, INTENT(IN) :: row, col, width
+                INTEGER, INTENT(OUT) :: new_col
 
-        SUBROUTINE meshgrid(x, y, x_mesh, y_mesh)
-                REAL, DIMENSION(:), INTENT(IN) :: x, y
-                REAL, DIMENSION(:,:), INTENT(OUT):: x_mesh, y_mesh
-                INTEGER :: n_x, n_y, i, j
-
-                n_x = SIZE(x)
-                n_y = SIZE(y)
-
-                DO i=1,n_x
-                        DO j=1,n_y
-                                x_mesh(i, j) = x(i)
-                                y_mesh(i, j) = y(j)
-                        END DO
-                END DO
-        END SUBROUTINE 
+                new_col = (width + 1) + (col-row)
+        END SUBROUTINE
 
         PROGRAM hw1
-        
-        INTEGER :: N, i, j
+        INTEGER :: N, i, j, k, row, col, new_col, width
         REAL :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
         REAL :: I0, sigma, theta
         REAL :: A, B, C, D, f
@@ -85,8 +75,11 @@
         theta_max = 1.5707963268
         I0 = 1.0
         sigma = 1.0
+        k = 3
 
-        N = 5
+        width = 5
+
+        N = 50
         ALLOCATE(r_array(N+1))
         ALLOCATE(theta_array(N+1))
 
@@ -98,49 +91,102 @@
         
         ALLOCATE(U(N**2))
         ALLOCATE(Y(N**2))
-        ALLOCATE(coeff_mat(N**2, N**2))
-
+        ALLOCATE(coeff_mat(N**2, 2*width + 1))
         coeff_mat = 0.0
         Y = 0.0
         
         DO j=1,N
-                DO i=1,N
-                        A = get_A(r_array(i), delta_r)
-                        B = get_B(r_array(i), delta_r)
-                        C = get_C(r_array(i), delta_r, delta_theta)
-                        D = get_D(r_array(i), delta_theta)
+        DO i=1,N
+        CALL get_A(r_array(i), delta_r, A)
+        CALL get_B(r_array(i), delta_r, B)
+        CALL get_C(r_array(i), delta_r, delta_theta, C)
+        CALL get_D(r_array(i), delta_theta, D)
 
-                        coeff_mat((j-1)*N+i, (j-1)*N+i) = C
+        row = (j-1)*N+i
+        col = (j-1)*N+i
 
-                        IF (i == 1) THEN
-                                coeff_mat((j-1)*N+i,(j-1)*N+i+1) = A+B
-                        ELSE
-                                coeff_mat((j-1)*N+i, (j-1)*N+i-1) = B
-                        END IF 
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = C
 
-                        IF (i == N) THEN
-                                theta = theta_array(j)
-                                f = bc(k, I0, sigma, r_max, theta)
-                                Y((j-1)*N+i) = -A * f
-                        ELSE 
-                                coeff_mat((j-1)*N+i,(j-1)*N+i+1) = A
-                        END IF
+        IF (i == 1) THEN
+        row = (j-1)*N+i
+        col = (j-1)*N+i+1
+        
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = A+B
 
-                        IF (j == 1) THEN
-                                coeff_mat((j-1)*N+i,j*N+i) = 2*D
-                        ELSE
-                                coeff_mat((j-1)*N+i,(j-2)*N+i) = D
-                        END IF 
+        ELSE
+        row = (j-1)*N+i
+        col = (j-1)*N+i-1
 
-                        IF (j == N) THEN
-                                Y((j-1)*N+i) = 0.0
-                        ELSE
-                                coeff_mat((j-1)*N+i,j*N+i) = D
-                        END IF
-                END DO
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = B
+
+        END IF 
+
+        IF (i == N) THEN
+        CALL bc(k,I0,sigma,r_max,theta_array(j), f)
+        row = (j-1)*N+i
+        Y(row) = -A * f
+
+        ELSE 
+        row = (j-1)*N+i
+        col = (j-1)*N+i+1
+
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = A
+
+        END IF
+
+        IF (j == 1) THEN
+        row = (j-1)*N+i
+        col = j*N+i
+
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = 2*D
+
+        ELSE
+        row = (j-1)*N+i
+        col = (j-2)*N+i
+
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = D
+
+        END IF 
+
+        IF (j < N) THEN
+        row = (j-1)*N+i
+        col = j*N+i
+
+        CALL mode2_index_map(row, col, width, new_col)
+        coeff_mat(row, new_col) = D
+
+        END IF
+
         END DO
-        OPEN(1, file="output.dat")
+        END DO
+
+        OPEN(1, file="coeff.dat")
+        OPEN(2, file="y.dat")
+        OPEN(3, file="u.dat")
+
         DO i=1,N**2
-                WRITE(1,*) coeff_mat(i,:)
+        PRINT *, coeff_mat(i,:), y(i)
+        WRITE(1,*) coeff_mat(i,:)
+        WRITE(2,*) Y(i)
+
         END DO
+
+        CALL SOLVE(3, coeff_mat, Y, N**2, width, N**2, 2*width+1)
+
+        DO i=1,N**2
+        PRINT *, y(i)
+        WRITE(3,*) Y(i)
+
+        END DO
+
+        CLOSE(1)
+        CLOSE(2)
+        CLOSE(3)
+
         END PROGRAM hw1
