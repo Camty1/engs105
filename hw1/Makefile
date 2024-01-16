@@ -2,7 +2,7 @@ FC = gfortran
 OBJs = solve.o hw1.o
 
 hw1: $(OBJs)
-	$(FC) -o -g $@ $^
+	$(FC) -o $@ $^
 
 %.o: %.f
 	$(FC) -c $<
