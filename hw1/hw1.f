@@ -15,7 +15,7 @@
         sigma = 1.0
         k = 3
 
-        N = 50
+        N = 95
         ALLOCATE(r_array(N+1))
         ALLOCATE(theta_array(N+1))
         width = N
@@ -51,8 +51,6 @@
         CALL get_B(r_array(i), delta_r, delta_theta, B)
         CALL get_C(r_array(i), delta_r, delta_theta, C)
         CALL get_D(r_array(i), D)
-
-        PRINT *, i, j, A, B, C, D
 
         row = (j-1)*N+i
         col = (j-1)*N+i
