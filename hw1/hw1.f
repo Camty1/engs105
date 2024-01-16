@@ -47,10 +47,10 @@
         WRITE(3,*) r_array(i) * COS(theta_array(j))
         WRITE(4,*) r_array(i) * SIN(theta_array(j))
 
-        CALL get_A(r_array(i), delta_r, delta_theta, A)
-        CALL get_B(r_array(i), delta_r, delta_theta, B)
+        CALL get_A(r_array(i), delta_r, A)
+        CALL get_B(r_array(i), delta_r, B)
         CALL get_C(r_array(i), delta_r, delta_theta, C)
-        CALL get_D(r_array(i), D)
+        CALL get_D(r_array(i), delta_theta, D)
 
         row = (j-1)*N+i
         col = (j-1)*N+i
@@ -144,33 +144,32 @@
                 f = -I0 / sigma * R * COS(k * theta)
         END SUBROUTINE
 
-        SUBROUTINE get_A(r, delta_r, delta_theta, A)
-                REAL, INTENT(IN) :: r, delta_r, delta_theta
+        SUBROUTINE get_A(r, delta_r, A)
+                REAL, INTENT(IN) :: r, delta_r
                 REAL, INTENT(OUT) :: A
 
-                A = delta_theta**2/(2*r*delta_r)
-                A = A + delta_theta**2/delta_r**2
+                A = 1/(2*r*delta_r) + 1/delta_r**2
         END SUBROUTINE
 
-        SUBROUTINE get_B(r, delta_r, delta_theta, B)
-                REAL, INTENT(IN) :: r, delta_r, delta_theta
+        SUBROUTINE get_B(r, delta_r, B)
+                REAL, INTENT(IN) :: r, delta_r
                 REAL, INTENT(OUT) :: B
 
-                B = -delta_theta**2/(2*r*delta_r)+delta_theta**2/delta_r**2
+                A = -1/(2*r*delta_r) + 1/delta_r**2
         END SUBROUTINE
 
         SUBROUTINE get_C(r, delta_r, delta_theta, C)
                 REAL, INTENT(IN) :: r, delta_r, delta_theta
                 REAL, INTENT(OUT) :: C
                 
-                C = -2*(delta_theta**2/delta_r**2+1/r**2)
+                C = -2*(1/delta_r**2+1/(r**2*delta_theta**2))
         END SUBROUTINE
 
-        SUBROUTINE get_D(r, D)
-                REAL, INTENT(IN) :: r
+        SUBROUTINE get_D(r, delta_theta, D)
+                REAL, INTENT(IN) :: r, delta_theta
                 REAL, INTENT(OUT) :: D
 
-                D = 1/r**2
+                D = 1/(r**2*delta_theta**2)
         END SUBROUTINE
         
         SUBROUTINE linspace(x_min, x_max, num_points, arr)
