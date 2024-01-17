@@ -15,7 +15,7 @@
         sigma = 1.0
         k = 3
 
-        N = 95
+        N = 125
         ALLOCATE(r_array(N+1))
         ALLOCATE(theta_array(N+1))
         width = N

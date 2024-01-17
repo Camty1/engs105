@@ -16,7 +16,7 @@ C   ASYMMETRIC BAND MATRIX EQUATION SOLVER (SIGNLE PRECISION)
 C   DOCTORED TO IGNORE ZEROS IN LU DECOMP. STEP                                 
 C                                                                               
       INTEGER KKK,NEQ,IHALFB,NDIM,MDIM
-      REAL*4 B(NDIM,MDIM),R(NDIM)                                            
+      REAL*8 B(NDIM,MDIM),R(NDIM)                                            
       NRS=NEQ-1                                                                 
       IHBP=IHALFB+1                                                             
       IF (KKK.EQ.2) GO TO 30                                                    

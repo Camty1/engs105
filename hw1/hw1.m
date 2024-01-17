@@ -153,3 +153,9 @@ quiver(x_50_meshgrid(2:49, 2:49), y_50_meshgrid(2:49, 2:49), grad_x_50(2:49, 2:4
 title("Negative Gradient of Numerical Solution, N=50");
 xlabel("x");
 ylabel("y");
+
+error_50_meshgrid = error_map(r_50_meshgrid, theta_50_meshgrid, u_50_meshgrid, u_analytical);
+
+figure(8);
+contour(x_50_meshgrid, y_50_meshgrid, error_50_meshgrid, 'EdgeAlpha', 0.3);
+

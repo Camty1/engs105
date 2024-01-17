@@ -1,10 +1,12 @@
         PROGRAM hw2
+        IMPLICIT REAL*8 (A-H, O-Z)
+
         INTEGER :: N, i, j, k, row, col, new_col, width
-        REAL :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
-        REAL :: I0, sigma, theta, alpha
-        REAL :: A, B, C, D, E, f, g
-        REAL, DIMENSION(:), ALLOCATABLE :: r_array, theta_array, U, Y
-        REAL, DIMENSION(:, :), ALLOCATABLE :: coeff_mat
+        REAL*8 :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
+        REAL*8 :: I0, sigma, theta, alpha
+        REAL*8 :: A, B, C, D, E, f, g
+        REAL*8, DIMENSION(:), ALLOCATABLE :: r_array, theta_array, U, Y
+        REAL*8, DIMENSION(:, :), ALLOCATABLE :: coeff_mat
         CHARACTER (LEN=30) :: fname
 
         r_min = 0.1
@@ -14,7 +16,7 @@
         I0 = 1.0
         sigma = 1.0
         k = 3
-        alpha = 0.01
+        alpha = 1
 
         N = 50
         ALLOCATE(r_array(N))
@@ -149,59 +151,59 @@
 
         SUBROUTINE bc(k, I0, sigma, R, theta, f)
                 INTEGER, INTENT(IN) :: k
-                REAL, INTENT(IN) :: I0, sigma, R, theta
-                REAL, INTENT(OUT) :: f
+                REAL*8, INTENT(IN) :: I0, sigma, R, theta
+                REAL*8, INTENT(OUT) :: f
 
                 f = -I0 / sigma * R * COS(k * theta)
         END SUBROUTINE
 
         SUBROUTINE get_A(r, delta_r, delta_theta, A)
-                REAL, INTENT(IN) :: r, delta_r, delta_theta
-                REAL, INTENT(OUT) :: A
+                REAL*8, INTENT(IN) :: r, delta_r, delta_theta
+                REAL*8, INTENT(OUT) :: A
 
                 A = delta_theta**2*(1/(2*r*delta_r) + 1/delta_r**2)
         END SUBROUTINE
 
         SUBROUTINE get_B(r, delta_r, delta_theta, B)
-                REAL, INTENT(IN) :: r, delta_r, delta_theta
-                REAL, INTENT(OUT) :: B
+                REAL*8, INTENT(IN) :: r, delta_r, delta_theta
+                REAL*8, INTENT(OUT) :: B
 
                 B = delta_theta**2*(-1/(2*r*delta_r) + 1/delta_r**2)
         END SUBROUTINE
 
         SUBROUTINE get_C(r, delta_r, delta_theta, C)
-                REAL, INTENT(IN) :: r, delta_r, delta_theta
-                REAL, INTENT(OUT) :: C
+                REAL*8, INTENT(IN) :: r, delta_r, delta_theta
+                REAL*8, INTENT(OUT) :: C
                 
                 C = -2*(delta_theta**2/delta_r**2+1/r**2)
         END SUBROUTINE
 
         SUBROUTINE get_D(r, D)
-                REAL, INTENT(IN) :: r
-                REAL, INTENT(OUT) :: D
+                REAL*8, INTENT(IN) :: r
+                REAL*8, INTENT(OUT) :: D
 
                 D = 1/r**2
         END SUBROUTINE
 
         SUBROUTINE get_E(r, delta_theta, alpha, E)
-                REAL, INTENT(IN) :: r, delta_theta, alpha
-                REAL, INTENT(OUT) :: E
+                REAL*8, INTENT(IN) :: r, delta_theta, alpha
+                REAL*8, INTENT(OUT) :: E
 
                 E = -2*r*delta_theta*alpha
         END SUBROUTINE
 
         SUBROUTINE get_g(r, delta_theta, k, I0, sigma, g)
-                REAL, INTENT(IN) :: r, delta_theta, I0, sigma
+                REAL*8, INTENT(IN) :: r, delta_theta, I0, sigma
                 INTEGER, INTENT(IN) :: k
-                REAL, INTENT(OUT) :: g
+                REAL*8, INTENT(OUT) :: g
 
                 g = -2*r*delta_theta*k*I0/sigma
         END SUBROUTINE
         
         SUBROUTINE linspace(x_min, x_max, num_points, arr)
-                REAL, INTENT(IN) :: x_min, x_max
+                REAL*8, INTENT(IN) :: x_min, x_max
                 INTEGER, INTENT(IN) :: num_points
-                REAL, DIMENSION(num_points), INTENT(OUT) :: arr
+                REAL*8, DIMENSION(num_points), INTENT(OUT) :: arr
                 INTEGER :: i
 
                 DO i=1,num_points
@@ -211,8 +213,8 @@
         END SUBROUTINE
 
         SUBROUTINE polar_2_cart(r, theta, x, y)
-                REAL, INTENT(IN) :: r, theta
-                REAL, INTENT(OUT) :: x, y
+                REAL*8, INTENT(IN) :: r, theta
+                REAL*8, INTENT(OUT) :: x, y
 
                 x = r * COS(theta)
                 y = r * SIN(theta)

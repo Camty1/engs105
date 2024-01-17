@@ -15,6 +15,10 @@ x_50_100 = readmatrix_fortran("output/100/x050.dat");
 y_50_100 = readmatrix_fortran("output/100/y050.dat");
 u_50_100 = readmatrix_fortran("output/100/u050.dat");
 
+x_50_1000 = readmatrix_fortran("output/1000/x050.dat");
+y_50_1000 = readmatrix_fortran("output/1000/y050.dat");
+u_50_1000 = readmatrix_fortran("output/1000/u050.dat");
+
 x_50_01 = readmatrix_fortran("output/01/x050.dat");
 y_50_01 = readmatrix_fortran("output/01/y050.dat");
 u_50_01 = readmatrix_fortran("output/01/u050.dat");
@@ -22,6 +26,10 @@ u_50_01 = readmatrix_fortran("output/01/u050.dat");
 x_50_001 = readmatrix_fortran("output/001/x050.dat");
 y_50_001 = readmatrix_fortran("output/001/y050.dat");
 u_50_001 = readmatrix_fortran("output/001/u050.dat");
+
+x_50_0001 = readmatrix_fortran("output/0001/x050.dat");
+y_50_0001 = readmatrix_fortran("output/0001/y050.dat");
+u_50_0001 = readmatrix_fortran("output/0001/u050.dat");
 
 % Form meshgrids of data
 x_50_1_meshgrid = reshape(x_50_1, 50, 50);
@@ -36,6 +44,10 @@ x_50_100_meshgrid = reshape(x_50_100, 50, 50);
 y_50_100_meshgrid = reshape(y_50_100, 50, 50);
 u_50_100_meshgrid = reshape(u_50_100, 50, 50);
 
+x_50_1000_meshgrid = reshape(x_50_1000, 50, 50);
+y_50_1000_meshgrid = reshape(y_50_1000, 50, 50);
+u_50_1000_meshgrid = reshape(u_50_1000, 50, 50);
+
 x_50_01_meshgrid = reshape(x_50_01, 50, 50);
 y_50_01_meshgrid = reshape(y_50_01, 50, 50);
 u_50_01_meshgrid = reshape(u_50_01, 50, 50);
@@ -43,6 +55,10 @@ u_50_01_meshgrid = reshape(u_50_01, 50, 50);
 x_50_001_meshgrid = reshape(x_50_001, 50, 50);
 y_50_001_meshgrid = reshape(y_50_001, 50, 50);
 u_50_001_meshgrid = reshape(u_50_001, 50, 50);
+
+x_50_0001_meshgrid = reshape(x_50_0001, 50, 50);
+y_50_0001_meshgrid = reshape(y_50_0001, 50, 50);
+u_50_0001_meshgrid = reshape(u_50_0001, 50, 50);
 
 % Use common limits for all plots to make comparison easier
 plotting_limits = [0, 1; 0, 1; -1.5, 1];
@@ -89,6 +105,19 @@ saveas(gcf, "figures/100.png")
 
 figure(4);
 colormap winter;
+surf(x_50_1000_meshgrid, y_50_1000_meshgrid, u_50_1000_meshgrid, "EdgeAlpha", 0.3);
+view(15,30);
+title("Numerical Solution of PDE, N=50, A=1000");
+xlabel("x");
+ylabel("y");
+zlabel("Potential");
+xlim(plotting_limits(1,:));
+ylim(plotting_limits(2,:));
+zlim(plotting_limits(3,:));
+saveas(gcf, "figures/1000.png")
+
+figure(5);
+colormap winter;
 surf(x_50_01_meshgrid, y_50_01_meshgrid, u_50_01_meshgrid, "EdgeAlpha", 0.3);
 view(15,30);
 title("Numerical Solution of PDE, N=50, A=0.1");
@@ -100,7 +129,7 @@ ylim(plotting_limits(2,:));
 zlim(plotting_limits(3,:));
 saveas(gcf, "figures/01.png")
 
-figure(5);
+figure(6);
 colormap winter;
 surf(x_50_001_meshgrid, y_50_001_meshgrid, u_50_001_meshgrid, "EdgeAlpha", 0.3);
 view(15,30);
@@ -113,3 +142,15 @@ zlim(plotting_limits(3,:));
 zlabel("Potential");
 saveas(gcf, "figures/001.png")
 
+figure(7);
+colormap winter;
+surf(x_50_0001_meshgrid, y_50_0001_meshgrid, u_50_0001_meshgrid, "EdgeAlpha", 0.3);
+view(15,30);
+title("Numerical Solution of PDE, N=50, A=0.001");
+xlabel("x");
+ylabel("y");
+xlim(plotting_limits(1,:));
+ylim(plotting_limits(2,:));
+zlim(plotting_limits(3,:));
+zlabel("Potential");
+saveas(gcf, "figures/0001.png")
