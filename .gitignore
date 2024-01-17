@@ -1,2 +1,10 @@
+# Ignore executables
+*
+!*.*
+!*/
+
+# Ignore fotran object files
 *.o
+
+# Ignore MATLAB autosave files
 *.asv
