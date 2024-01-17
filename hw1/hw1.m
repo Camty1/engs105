@@ -62,11 +62,11 @@ xlim([-.06, 1.06]);
 ylim([-.06, 1.06]);
 
 %% Numerical Solution (coarse)
-x_5 = readmatrix_fortran("output\x005.dat");
-y_5 = readmatrix_fortran("output\y005.dat");
-u_5 = readmatrix_fortran("output\u005.dat");
-r_5 = readmatrix_fortran("output\r005.dat");
-theta_5 = readmatrix_fortran("output\theta005.dat");
+x_5 = readmatrix_fortran("output/x005.dat");
+y_5 = readmatrix_fortran("output/y005.dat");
+u_5 = readmatrix_fortran("output/u005.dat");
+r_5 = readmatrix_fortran("output/r005.dat");
+theta_5 = readmatrix_fortran("output/theta005.dat");
 
 x_5_meshgrid = reshape(x_5, 5, 5);
 y_5_meshgrid = reshape(y_5, 5, 5);
@@ -113,11 +113,11 @@ xlabel("\Delta r");
 ylabel("RMS Error");
 
 %% Converged Numerical Solution
-x_50 = readmatrix_fortran("output\x050.dat");
-y_50 = readmatrix_fortran("output\y050.dat");
-u_50 = readmatrix_fortran("output\u050.dat");
-r_50 = readmatrix_fortran("output\r050.dat");
-theta_50 = readmatrix_fortran("output\theta050.dat");
+x_50 = readmatrix_fortran("output/x050.dat");
+y_50 = readmatrix_fortran("output/y050.dat");
+u_50 = readmatrix_fortran("output/u050.dat");
+r_50 = readmatrix_fortran("output/r050.dat");
+theta_50 = readmatrix_fortran("output/theta050.dat");
 
 x_50_meshgrid = reshape(x_50, 50, 50);
 y_50_meshgrid = reshape(y_50, 50, 50);
