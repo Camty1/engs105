@@ -60,6 +60,8 @@ x_50_0001_meshgrid = reshape(x_50_0001, 50, 50);
 y_50_0001_meshgrid = reshape(y_50_0001, 50, 50);
 u_50_0001_meshgrid = reshape(u_50_0001, 50, 50);
 
+u_50_jacobi = readmatrix_fortran('output/jacobi050.dat');
+
 % Use common limits for all plots to make comparison easier
 plotting_limits = [0, 1; 0, 1; -1.5, 1];
 
