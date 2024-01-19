@@ -149,6 +149,143 @@
 
         END PROGRAM hw2
 
+        SUBROUTINE GEN_SYS_EQNS(N, alpha, COEFF, Y)
+                INTEGER, INTENT(IN) :: N
+                REAL*8, INTENT(IN) :: alpha
+                REAL*8, DIMENSION(N**2, 2*N+1), INTENT(INOUT) :: COEFF
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: Y
+
+                INTEGER :: i, j, k, row, col, new_col, width
+                REAL*8 :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
+                REAL*8 :: I0, sigma, theta
+                REAL*8 :: A, B, C, D, E, f, g
+                REAL*8, DIMENSION(:), ALLOCATABLE :: r_array, theta_array 
+                CHARACTER (LEN=30) :: fname
+
+                r_min = 0.1
+                r_max = 1.0
+                theta_min = 0
+                theta_max = 1.5707963268
+                I0 = 1.0
+                sigma = 1.0
+                k = 3
+                ALLOCATE(r_array(N))
+                ALLOCATE(theta_array(N))
+                width = N
+                CALL linspace(r_min, r_max, N, r_array)
+                CALL linspace(theta_min, theta_max, N, theta_array)
+
+                delta_r = r_array(2) - r_array(1)
+                delta_theta = theta_array(2) - theta_array(1)
+                
+                coeff_mat = 0.0
+                Y = 0.0
+                WRITE(fname,'("output/r",I3.3,".dat")')N
+                OPEN(1, file=fname)
+                WRITE(fname,'("output/theta",I3.3,".dat")')N
+                OPEN(2, file=fname)
+                WRITE(fname,'("output/x",I3.3,".dat")')N
+                OPEN(3, file=fname)
+                WRITE(fname,'("output/y",I3.3,".dat")')N
+                OPEN(4, file=fname)
+
+                DO j=1,N
+                DO i=1,N
+
+                WRITE(1,*) r_array(i)
+                WRITE(2,*) theta_array(j)
+                WRITE(3,*) r_array(i) * COS(theta_array(j))
+                WRITE(4,*) r_array(i) * SIN(theta_array(j))
+
+                CALL get_A(r_array(i), delta_r, delta_theta, A)
+                CALL get_B(r_array(i), delta_r, delta_theta, B)
+                CALL get_C(r_array(i), delta_r, delta_theta, C)
+                CALL get_D(r_array(i), D)
+
+                row = (j-1)*N+i
+                col = (j-1)*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = C
+
+                IF (j == 1) THEN
+                col = j*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = 2*D
+
+                ELSE IF (j == N) THEN
+                CALL get_E(r_array(i), delta_theta, alpha, E)
+                CALL get_g(r_array(i), delta_theta, k, I0, sigma, g)
+
+                col = (j-1)*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = C+E*D
+
+                col = (j-2)*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = 2*D
+
+                Y(row) = -g*D
+
+                ELSE 
+                col = (j-2)*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = D
+
+                col = j*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = D
+
+                END IF 
+                
+                IF (i == 1) THEN
+                col = (j-1)*N+i+1
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = A+B
+
+                ELSE IF (i == N) THEN
+                col = (j-1)*N+i
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, :) = 0
+                coeff_mat(row, new_col) = 1
+
+                CALL bc(k,I0,sigma,r_max,theta_array(j), f)
+                Y(row) = f
+
+                ELSE
+                col = (j-1)*N+i-1
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = B
+
+                col = (j-1)*N+i+1
+                CALL mode2_index_map(row, col, width, new_col)
+                coeff_mat(row, new_col) = A
+
+                END IF 
+
+                END DO
+                END DO
+
+                CLOSE(1)
+                CLOSE(2)
+                CLOSE(3)
+                CLOSE(4)
+
+                WRITE(fname, '( "output/coeff", I3.3, ".dat" )' ) N
+                OPEN(1, file=fname)
+                WRITE(fname, '( "output/b", I3.3, ".dat" )' ) N
+                OPEN(2, file=fname)
+
+                DO i=1,N**2
+                WRITE(1,*) coeff_mat(i,:)
+                WRITE(2,*) Y(i)
+
+                END DO
+
+                CLOSE(1)
+                CLOSE(2)
+                
+        END SUBROUTINE
+
         SUBROUTINE bc(k, I0, sigma, R, theta, f)
                 INTEGER, INTENT(IN) :: k
                 REAL*8, INTENT(IN) :: I0, sigma, R, theta
