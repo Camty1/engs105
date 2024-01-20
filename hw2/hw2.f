@@ -1,151 +1,60 @@
         PROGRAM hw2
         IMPLICIT REAL*8 (A-H, O-Z)
 
-        INTEGER :: N, i, j, k, row, col, new_col, width
-        REAL*8 :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
-        REAL*8 :: I0, sigma, theta, alpha
-        REAL*8 :: A, B, C, D, E, f, g
-        REAL*8, DIMENSION(:), ALLOCATABLE :: r_array, theta_array, U, Y
-        REAL*8, DIMENSION(:, :), ALLOCATABLE :: coeff_mat
-        CHARACTER (LEN=30) :: fname
-
-        r_min = 0.1
-        r_max = 1.0
-        theta_min = 0.0
-        theta_max = 1.5707963268
-        I0 = 1.0
-        sigma = 1.0
-        k = 3
-        alpha = 1
-
-        N = 100
-        ALLOCATE(r_array(N))
-        ALLOCATE(theta_array(N))
-        width = N
-        CALL linspace(r_min, r_max, N, r_array)
-        CALL linspace(theta_min, theta_max, N, theta_array)
-
-        delta_r = r_array(2) - r_array(1)
-        delta_theta = theta_array(2) - theta_array(1)
+        INTEGER, PARAMETER :: N = 100
+        REAL*8, PARAMETER :: alpha = 1.0, threshold = 1E-5
         
-        ALLOCATE(U(N**2))
-        ALLOCATE(Y(N**2))
-        ALLOCATE(coeff_mat(N**2, 2*width + 1))
+        REAL*8, DIMENSION(N) :: r_array, theta_array
+        REAL*8, DIMENSION(N**2) :: U, U_true, Y, diag
+        REAL*8, DIMENSION(N**2, 2*N+1) :: coeff_mat, lower, upper, lt
+        REAL*8, DIMENSION(100**2) :: U_100
+
+        INTEGER :: i
+        REAL*8 :: err
+
         coeff_mat = 0.0
         Y = 0.0
-        WRITE(fname,'("output/r",I3.3,".dat")')N
-        OPEN(1, file=fname)
-        WRITE(fname,'("output/theta",I3.3,".dat")')N
-        OPEN(2, file=fname)
-        WRITE(fname,'("output/x",I3.3,".dat")')N
-        OPEN(3, file=fname)
-        WRITE(fname,'("output/y",I3.3,".dat")')N
-        OPEN(4, file=fname)
+        U = 0.0
 
-        DO j=1,N
-        DO i=1,N
+        OPEN(1, file="output/u100_1.dat")
+        READ(1,*) U_100
+        CLOSE(1)
 
-        WRITE(1,*) r_array(i)
-        WRITE(2,*) theta_array(j)
-        WRITE(3,*) r_array(i) * COS(theta_array(j))
-        WRITE(4,*) r_array(i) * SIN(theta_array(j))
+        OPEN(1, file="output/u020_1.dat")
 
-        CALL get_A(r_array(i), delta_r, delta_theta, A)
-        CALL get_B(r_array(i), delta_r, delta_theta, B)
-        CALL get_C(r_array(i), delta_r, delta_theta, C)
-        CALL get_D(r_array(i), D)
-
-        row = (j-1)*N+i
-        col = (j-1)*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = C
-
-        IF (j == 1) THEN
-        col = j*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = 2*D
-
-        ELSE IF (j == N) THEN
-        CALL get_E(r_array(i), delta_theta, alpha, E)
-        CALL get_g(r_array(i), delta_theta, k, I0, sigma, g)
-
-        col = (j-1)*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = C+E*D
-
-        col = (j-2)*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = 2*D
-
-        Y(row) = -g*D
-
-        ELSE 
-        col = (j-2)*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = D
-
-        col = j*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = D
-
-        END IF 
+        DO i=1,N**2
+                CALL INTERP_TRUE(i, U_100, N, 100, U_true(i))
+                WRITE(1,*) U_true(i)
+        END DO
+        U = U_true/2
+        CLOSE(1)
         
-        IF (i == 1) THEN
-        col = (j-1)*N+i+1
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = A+B
+        CALL GEN_SYS_EQNS(N, alpha, coeff_mat, Y)
 
-        ELSE IF (i == N) THEN
-        col = (j-1)*N+i
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, :) = 0
-        coeff_mat(row, new_col) = 1
+        CALL DIAG_DOMINANCE_CHECK(coeff_mat, Y, N)
+        diag = 0.0
+        lower = 0.0
+        upper = 1
 
-        CALL bc(k,I0,sigma,r_max,theta_array(j), f)
-        Y(row) = f
-
-        ELSE
-        col = (j-1)*N+i-1
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = B
-
-        col = (j-1)*N+i+1
-        CALL mode2_index_map(row, col, width, new_col)
-        coeff_mat(row, new_col) = A
-
-        END IF 
-
-        END DO
-        END DO
-
-        CLOSE(1)
-        CLOSE(2)
-        CLOSE(3)
-        CLOSE(4)
-
-        WRITE(fname, '( "output/coeff", I3.3, ".dat" )' ) N
-        OPEN(1, file=fname)
-        WRITE(fname, '( "output/b", I3.3, ".dat" )' ) N
-        OPEN(2, file=fname)
-        WRITE(fname, '( "output/u", I3.3, ".dat" )' ) N
-        OPEN(3, file=fname)
+        lower(:, 1:N) = coeff_mat(:, 1:N)
+        upper(:, N+2:2*N+1) = coeff_mat(:, N+2:2*N+1)
 
         DO i=1,N**2
-        WRITE(1,*) coeff_mat(i,:)
-        WRITE(2,*) Y(i)
-
+                diag(i) = coeff_mat(i, N+1)
         END DO
+        
+        lt = lower + upper
 
-        CALL SOLVE(3, coeff_mat, Y, N**2, width, N**2, 2*width+1)
+        CALL CALC_ERROR(U, U_true, N**2, err)
+        PRINT *, err
+        CALL JACOBI(diag, lower, upper, Y, N**2, N, U)
+        PRINT *, err
 
-        DO i=1,N**2
-        WRITE(3,*) Y(i)
-
-        END DO
-
-        CLOSE(1)
-        CLOSE(2)
-        CLOSE(3)
+!        DO WHILE (err > threshold)
+!                PRINT *, err
+!                CALL JACOBI(diag, lower, upper, Y, N**2, N, U)
+!                CALL CALC_ERROR(U, U_true, N**2, err)
+!        END DO
 
         END PROGRAM hw2
 
@@ -155,11 +64,11 @@
                 REAL*8, DIMENSION(N**2, 2*N+1), INTENT(INOUT) :: COEFF
                 REAL*8, DIMENSION(N**2), INTENT(INOUT) :: Y
 
-                INTEGER :: i, j, k, row, col, new_col, width
-                REAL*8 :: r_min, r_max, theta_min, theta_max, delta_r, delta_theta
-                REAL*8 :: I0, sigma, theta
+                INTEGER :: i, j, k, row, col, new_col
+                REAL*8 :: r_min, r_max, theta_min, theta_max, dr, dtheta
+                REAL*8 :: I0, sigma
                 REAL*8 :: A, B, C, D, E, f, g
-                REAL*8, DIMENSION(:), ALLOCATABLE :: r_array, theta_array 
+                REAL*8, DIMENSION(N) :: r_array, theta_array 
                 CHARACTER (LEN=30) :: fname
 
                 r_min = 0.1
@@ -169,16 +78,14 @@
                 I0 = 1.0
                 sigma = 1.0
                 k = 3
-                ALLOCATE(r_array(N))
-                ALLOCATE(theta_array(N))
-                width = N
+
                 CALL linspace(r_min, r_max, N, r_array)
                 CALL linspace(theta_min, theta_max, N, theta_array)
 
-                delta_r = r_array(2) - r_array(1)
-                delta_theta = theta_array(2) - theta_array(1)
+                dr = r_array(2) - r_array(1)
+                dtheta = theta_array(2) - theta_array(1)
                 
-                coeff_mat = 0.0
+                COEFF = 0.0
                 Y = 0.0
                 WRITE(fname,'("output/r",I3.3,".dat")')N
                 OPEN(1, file=fname)
@@ -197,68 +104,68 @@
                 WRITE(3,*) r_array(i) * COS(theta_array(j))
                 WRITE(4,*) r_array(i) * SIN(theta_array(j))
 
-                CALL get_A(r_array(i), delta_r, delta_theta, A)
-                CALL get_B(r_array(i), delta_r, delta_theta, B)
-                CALL get_C(r_array(i), delta_r, delta_theta, C)
+                CALL get_A(r_array(i), dr, dtheta, A)
+                CALL get_B(r_array(i), dr, dtheta, B)
+                CALL get_C(r_array(i), dr, dtheta, C)
                 CALL get_D(r_array(i), D)
 
                 row = (j-1)*N+i
                 col = (j-1)*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = C
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = C
 
                 IF (j == 1) THEN
                 col = j*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = 2*D
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = 2*D
 
                 ELSE IF (j == N) THEN
-                CALL get_E(r_array(i), delta_theta, alpha, E)
-                CALL get_g(r_array(i), delta_theta, k, I0, sigma, g)
+                CALL get_E(r_array(i), dtheta, alpha, E)
+                CALL get_g(r_array(i), dtheta, k, I0, sigma, g)
 
                 col = (j-1)*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = C+E*D
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = C+E*D
 
                 col = (j-2)*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = 2*D
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = 2*D
 
                 Y(row) = -g*D
 
                 ELSE 
                 col = (j-2)*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = D
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = D
 
                 col = j*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = D
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = D
 
                 END IF 
                 
                 IF (i == 1) THEN
                 col = (j-1)*N+i+1
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = A+B
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = A+B
 
                 ELSE IF (i == N) THEN
                 col = (j-1)*N+i
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, :) = 0
-                coeff_mat(row, new_col) = 1
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, :) = 0
+                COEFF(row, new_col) = 1
 
                 CALL bc(k,I0,sigma,r_max,theta_array(j), f)
                 Y(row) = f
 
                 ELSE
                 col = (j-1)*N+i-1
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = B
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = B
 
                 col = (j-1)*N+i+1
-                CALL mode2_index_map(row, col, width, new_col)
-                coeff_mat(row, new_col) = A
+                CALL mode2_index_map(row, col, N, new_col)
+                COEFF(row, new_col) = A
 
                 END IF 
 
@@ -276,7 +183,7 @@
                 OPEN(2, file=fname)
 
                 DO i=1,N**2
-                WRITE(1,*) coeff_mat(i,:)
+                WRITE(1,*) COEFF(i,:)
                 WRITE(2,*) Y(i)
 
                 END DO
@@ -364,19 +271,19 @@
                 new_col = (width + 1) + (col-row)
         END SUBROUTINE
 
-        SUBROUTINE JACOBI(D, LT, v, N, width, u)
+        SUBROUTINE JACOBI(D, lower, upper, Y, N, W, U)
                 REAL*8, DIMENSION(N), INTENT(IN) :: D
-                INTEGER, INTENT(IN) :: N, width
-                REAL*8, DIMENSION(N,2*width+1),INTENT(IN) :: LT
-                REAL*8, DIMENSION(N), INTENT(IN) :: v
-                REAL*8, DIMENSION(N), INTENT(INOUT) :: u
+                INTEGER, INTENT(IN) :: N, W
+                REAL*8, DIMENSION(N,2*W+1),INTENT(IN) :: lower, upper
+                REAL*8, DIMENSION(N), INTENT(IN) :: Y
+                REAL*8, DIMENSION(N), INTENT(INOUT) :: U
 
-                CALL BANDED_MULT_IN_PLACE(-LT, u, N, 2*width+1, width)
+                CALL BANDED_MULT_IN_PLACE(lower+upper,U,N,2*W+1,W)
 
-                u = u + v
+                U = -U + Y
 
                 DO i=1,N
-                        u(i) = u(i) / D(i)
+                        U(i) = U(i) / D(i)
                 END DO
         END SUBROUTINE
 
@@ -402,8 +309,6 @@
                 group = (i-1)/N + 1
                 item = MOD(i-1, N)+1
 
-                PRINT *, group, item
-
                 r_i = ratio * DBLE(item-1)
                 r_i = r_i - DBLE(INT(r_i))
                 r_g = ratio * DBLE(group-1)
@@ -411,8 +316,6 @@
 
                 group = FLOOR(DBLE(group-1)*ratio)+1
                 item = FLOOR(DBLE(item-1)*ratio)+1
-                PRINT *, group, item
-
 
                 idx = N_true * (group - 1) + item
                 alpha = (1 - r_i) * (1 - r_g) * U_true(idx)
@@ -427,5 +330,39 @@
                 delta = r_i * r_g * U_true(idx)
 
                 val = alpha + beta + gamma + delta
+
+        END SUBROUTINE
+
+        SUBROUTINE DIAG_DOMINANCE_CHECK(COEFF, Y, N)
+                INTEGER, INTENT(IN) :: N
+                REAL*8, DIMENSION(N**2, 2*N+1), INTENT(INOUT) :: COEFF
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: Y
+
+                INTEGER :: i, j
+                REAL*8 :: diag, non_diag
+
+                DO i=1,N**2
+                non_diag = 0
+                DO j=1,2*N+1
+                        non_diag = non_diag + COEFF(i,j)
+                END DO
+                diag = COEFF(i, N+1)
+                non_diag = non_diag - diag
+
+                IF (ABS(non_diag) > diag) THEN
+                        COEFF(i,:) = -COEFF(i,:)
+                        Y(i) = -Y(i)
+                        non_diag = 0
+                        diag = 0
+                        DO j=1,2*N+1
+                                non_diag = non_diag + COEFF(i,j)
+                        END DO
+                        diag = COEFF(i, N+1)
+                        non_diag = non_diag - diag
+                        IF (ABS(non_diag) > diag) THEN
+                                PRINT *, i, diag, non_diag
+                        END IF
+                END IF
+                END DO
 
         END SUBROUTINE

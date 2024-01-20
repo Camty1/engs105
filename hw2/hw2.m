@@ -62,6 +62,14 @@ u_50_0001_meshgrid = reshape(u_50_0001, 50, 50);
 
 u_50_jacobi = readmatrix_fortran('output/jacobi050.dat');
 
+x_20_1 = readmatrix_fortran('output/x020.dat');
+y_20_1 = readmatrix_fortran('output/y020.dat');
+u_20_1 = readmatrix_fortran('output/u020_1.dat');
+
+x_20_1_meshgrid = reshape(x_20_1, 20, 20);
+y_20_1_meshgrid = reshape(y_20_1, 20, 20);
+u_20_1_meshgrid = reshape(u_20_1, 20, 20);
+
 % Use common limits for all plots to make comparison easier
 plotting_limits = [0, 1; 0, 1; -1.5, 1];
 
@@ -156,3 +164,7 @@ ylim(plotting_limits(2,:));
 zlim(plotting_limits(3,:));
 zlabel("Potential");
 saveas(gcf, "figures/0001.png")
+
+figure(8);
+colormap winter;
+surf(x_20_1_meshgrid, y_20_1_meshgrid, u_20_1_meshgrid, 'EdgeAlpha', 0.3);
