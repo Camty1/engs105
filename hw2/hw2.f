@@ -5,17 +5,24 @@
         REAL*8, PARAMETER :: alpha = 1.0, threshold = 1E-5
         
         REAL*8, DIMENSION(N) :: r_array, theta_array
-        REAL*8, DIMENSION(N**2) :: U, U_true, Y, Y_cpy
+        REAL*8, DIMENSION(N**2) :: U_jac1,U_jac2,U_gs,U_sor,U_true
         REAL*8, DIMENSION(N**2, 1) :: diag
         REAL*8, DIMENSION(N**2, 2*N+1) :: coeff_mat, lower, upper
         REAL*8, DIMENSION(100**2) :: U_100
 
         INTEGER :: i
-        REAL*8 :: err
+        REAL*8 :: err, sigma, I0
+        
+        sigma = 1.0
+        I0 = 1.0
 
         coeff_mat = 0.0
         Y = 0.0
-        U = 0.0
+
+        U_jac1 = 0.0
+        U_jac2 = 0.0
+        U_gs = 0.0
+        U_sor = 0.0
 
         OPEN(1, file="output/u100_1.dat")
         READ(1,*) U_100
@@ -27,30 +34,22 @@
                 CALL INTERP_TRUE(i, U_100, N, 100, U_true(i))
                 WRITE(1,*) U_true(i)
         END DO
-        U = U_true/2
+        U = 0
         CLOSE(1)
         
-        CALL GEN_SYS_EQNS(N, alpha, coeff_mat, Y)
-        Y_cpy = Y
-
-        CALL DIAG_DOMINANCE_CHECK(coeff_mat, Y, N)
-        diag = 0.0
-        lower = 0.0
-        upper = 1
-
-        lower(:, 1:N) = coeff_mat(:, 1:N)
-        upper(:, N+2:2*N+1) = coeff_mat(:, N+2:2*N+1)
-
-        DO i=1,N**2
-                diag(i,1) = coeff_mat(i, N+1)
-        END DO
-        
-        CALL CALC_ERROR(U, U_true, N**2, err)
-
+        CALL CALC_ERROR(U_jac1, U_true, N**2, err)
+        PRINT *, err
+        iteration_counter = 0
         DO WHILE (err > threshold)
+                iteration_counter = iteration_counter + 1
+                IF (MOD(iteration_counter, 2) == 1) THEN
+                        CALL JACOBI(r_array, theta_array, alpha, N, k, I0, sigma, U_jac1, U_jac2)
+                        CALL CALC_ERROR(U_jac2, U_true, N**2, err)
+                ELSE
+                        CALL JACOBI(r_array, theta_array, alpha, N, k, I0, sigma, U_jac2, U_jac1)
+                        CALL CALC_ERROR(U_jac1, U_true, N**2, err)
+                END IF
                 PRINT *, err
-                CALL JACOBI(diag, lower, upper, Y, N, U)
-                CALL CALC_ERROR(U, U_true, N**2, err)
         END DO
 
         END PROGRAM hw2
@@ -268,19 +267,91 @@
                 new_col = (width + 1) + (col-row)
         END SUBROUTINE
 
-        SUBROUTINE JACOBI(diag, lower, upper, Y, N, U)
-                REAL*8, DIMENSION(N**2,1), INTENT(IN) :: diag
-                INTEGER, INTENT(IN) :: N
-                REAL*8, DIMENSION(N**2,2*N+1),INTENT(IN) :: lower, upper
-                REAL*8, DIMENSION(N**2), INTENT(IN) :: Y
-                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U
+        SUBROUTINE JACOBI(r_arr,theta_arr,alpha,N,k,I0,sigma,U,U_new)
+                REAL*8, DIMENSION(N**2),INTENT(IN) :: r_arr,theta_arr
+                REAL*8, DIMENSION(N**2), INTENT(IN) :: U
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U_new
+                INTEGER, INTENT(IN) :: N, k
+                REAL*8, INTENT(IN) :: alpha, I0, sigma
 
-                CALL BANDED_MULT_IN_PLACE(-(lower+upper),U,N**2,2*N+1,N)
+                INTEGER :: i, j, idx
+                REAL*8 :: A, B, C, D, E, f, g
+                REAL*8 :: dr, dtheta
 
-                U = U + Y
+                dr = r_arr(2)-r_arr(1)
+                dtheta = theta_arr(2)-theta_arr(1)
 
-                CALL DSOLVE(3, diag, U, N, 0, N, 1)
+                DO i=1,N
+                DO j=1,N
+                        
+                CALL get_A(r_arr(i), dr, dtheta, A)
+                CALL get_B(r_arr(i), dr, dtheta, B)
+                CALL get_C(r_arr(i), dr, dtheta, C)
+                CALL get_D(r_arr(i), D)
 
+                idx = (j-1)*N+i
+
+                IF (i == 1 .and. j == 1) THEN
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+
+                        U_new(idx) = -((A + B) * U(idx + N) + 2 * D * U(idx + 1)) / C
+
+                ELSE IF (i == 1 .and. j == N) THEN
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+                        CALL get_E(r_arr(i), dtheta, alpha, E)
+                        CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
+                        
+                        U_new(idx) = (-((A + B) * U(idx + 1) + 2 * D * U(idx - N)) - g * D)/(C + E * D)
+
+                ELSE IF (i == 1) THEN
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+
+                        U_new(idx) = -((A + B) * U(idx + 1) + D * (U(idx - N) + U(idx + N))) / C
+                        
+                ELSE IF (i == N) THEN
+                        CALL bc(k, I0, sigma, DBLE(1.0), theta_arr(j), U_new(idx))
+                         
+                        
+                ELSE IF (j == 1) THEN
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+
+                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + 2 * D * U(idx + N)) / C
+
+                ELSE IF (j == N) THEN
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+                        CALL get_E(r_arr(i), dtheta, alpha, E)
+                        CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
+
+                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + 2 * D * U(idx - N) + g * D) / (C + E * D)
+
+                ELSE
+                        CALL get_A(r_arr(i), dr, dtheta, A)
+                        CALL get_B(r_arr(i), dr, dtheta, B)
+                        CALL get_C(r_arr(i), dr, dtheta, C)
+                        CALL get_D(r_arr(i), D)
+
+                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + D * (U(idx - N) + U(idx + N))) / C
+
+                END IF
+
+                END DO
+                END DO
+                        
         END SUBROUTINE
 
         SUBROUTINE GAUSS_SIDEL(diag, lower, upper, Y, N, U)
