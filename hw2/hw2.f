@@ -5,8 +5,9 @@
         REAL*8, PARAMETER :: alpha = 1.0, threshold = 1E-5
         
         REAL*8, DIMENSION(N) :: r_array, theta_array
-        REAL*8, DIMENSION(N**2) :: U, U_true, Y, diag
-        REAL*8, DIMENSION(N**2, 2*N+1) :: coeff_mat, lower, upper, lt
+        REAL*8, DIMENSION(N**2) :: U, U_true, Y, Y_cpy
+        REAL*8, DIMENSION(N**2, 1) :: diag
+        REAL*8, DIMENSION(N**2, 2*N+1) :: coeff_mat, lower, upper
         REAL*8, DIMENSION(100**2) :: U_100
 
         INTEGER :: i
@@ -30,6 +31,7 @@
         CLOSE(1)
         
         CALL GEN_SYS_EQNS(N, alpha, coeff_mat, Y)
+        Y_cpy = Y
 
         CALL DIAG_DOMINANCE_CHECK(coeff_mat, Y, N)
         diag = 0.0
@@ -40,21 +42,16 @@
         upper(:, N+2:2*N+1) = coeff_mat(:, N+2:2*N+1)
 
         DO i=1,N**2
-                diag(i) = coeff_mat(i, N+1)
+                diag(i,1) = coeff_mat(i, N+1)
         END DO
         
-        lt = lower + upper
-
         CALL CALC_ERROR(U, U_true, N**2, err)
-        PRINT *, err
-        CALL JACOBI(diag, lower, upper, Y, N**2, N, U)
-        PRINT *, err
 
-!        DO WHILE (err > threshold)
-!                PRINT *, err
-!                CALL JACOBI(diag, lower, upper, Y, N**2, N, U)
-!                CALL CALC_ERROR(U, U_true, N**2, err)
-!        END DO
+        DO WHILE (err > threshold)
+                PRINT *, err
+                CALL JACOBI(diag, lower, upper, Y, N, U)
+                CALL CALC_ERROR(U, U_true, N**2, err)
+        END DO
 
         END PROGRAM hw2
 
@@ -271,20 +268,39 @@
                 new_col = (width + 1) + (col-row)
         END SUBROUTINE
 
-        SUBROUTINE JACOBI(D, lower, upper, Y, N, W, U)
-                REAL*8, DIMENSION(N), INTENT(IN) :: D
-                INTEGER, INTENT(IN) :: N, W
-                REAL*8, DIMENSION(N,2*W+1),INTENT(IN) :: lower, upper
-                REAL*8, DIMENSION(N), INTENT(IN) :: Y
-                REAL*8, DIMENSION(N), INTENT(INOUT) :: U
+        SUBROUTINE JACOBI(diag, lower, upper, Y, N, U)
+                REAL*8, DIMENSION(N**2,1), INTENT(IN) :: diag
+                INTEGER, INTENT(IN) :: N
+                REAL*8, DIMENSION(N**2,2*N+1),INTENT(IN) :: lower, upper
+                REAL*8, DIMENSION(N**2), INTENT(IN) :: Y
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U
 
-                CALL BANDED_MULT_IN_PLACE(lower+upper,U,N,2*W+1,W)
+                CALL BANDED_MULT_IN_PLACE(-(lower+upper),U,N**2,2*N+1,N)
 
-                U = -U + Y
+                U = U + Y
 
-                DO i=1,N
-                        U(i) = U(i) / D(i)
+                CALL DSOLVE(3, diag, U, N, 0, N, 1)
+
+        END SUBROUTINE
+
+        SUBROUTINE GAUSS_SIDEL(diag, lower, upper, Y, N, U)
+                REAL*8, DIMENSION(N**2,1), INTENT(IN) :: diag
+                INTEGER, INTENT(IN) :: N
+                REAL*8, DIMENSION(N**2,2*N+1),INTENT(IN) :: lower, upper
+                REAL*8, DIMENSION(N**2), INTENT(IN) :: Y
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U
+                REAL*8, DIMENSION(N**2,2*N+1) :: lhs
+
+                CALL BANDED_MULT_IN_PLACE(-upper,U,N**2,2*N+1,N)
+
+                U = U + Y
+                lhs = lower
+                DO i=1,N**2
+                        lhs(i, N+1) = diag(i,1)
                 END DO
+
+                CALL DSOLVE(3, lhs, U, N, 0, N, 1)
+
         END SUBROUTINE
 
         SUBROUTINE CALC_ERROR(U, U_TRUE, N, err)
@@ -344,25 +360,137 @@
                 DO i=1,N**2
                 non_diag = 0
                 DO j=1,2*N+1
-                        non_diag = non_diag + COEFF(i,j)
+                        non_diag = non_diag + ABS(COEFF(i,j))
                 END DO
                 diag = COEFF(i, N+1)
                 non_diag = non_diag - diag
 
-                IF (ABS(non_diag) > diag) THEN
+                IF (ABS(non_diag) > ABS(diag)) THEN
                         COEFF(i,:) = -COEFF(i,:)
                         Y(i) = -Y(i)
                         non_diag = 0
                         diag = 0
                         DO j=1,2*N+1
-                                non_diag = non_diag + COEFF(i,j)
+                                non_diag = non_diag + ABS(COEFF(i,j))
                         END DO
                         diag = COEFF(i, N+1)
                         non_diag = non_diag - diag
-                        IF (ABS(non_diag) > diag) THEN
+                        IF (ABS(non_diag) > ABS(diag)) THEN
                                 PRINT *, i, diag, non_diag
                         END IF
                 END IF
                 END DO
 
+        END SUBROUTINE
+
+        MODULE DOT
+        CONTAINS
+        SUBROUTINE MAT_VEC_DOT(A,B,i,a_min,a_max,b_min,b_max,out)
+                REAL*8, DIMENSION(:,:), INTENT(IN) :: A
+                REAL*8, DIMENSION(:), INTENT(IN) :: B
+                INTEGER, INTENT(IN) :: i, a_min, a_max, b_min, b_max
+                REAL*8, INTENT(OUT) :: out
+                
+                INTEGER :: j
+
+                out = 0
+                
+                DO j=1,a_max-a_min+1
+                        out = out + A(i,a_min-1+j) * B(b_min-1+j)
+                END DO
+
+        END SUBROUTINE
+        END MODULE DOT
+
+        SUBROUTINE BANDED_MULT_IN_PLACE(A, B, N_DIM, M_DIM, BANDWIDTH)
+                USE DOT
+                INTEGER, INTENT(IN) :: N_DIM, M_DIM, BANDWIDTH
+                REAL*8, DIMENSION(N_DIM,M_DIM), INTENT(IN) :: A
+                REAL*8, DIMENSION(N_DIM), INTENT(INOUT) :: B
+
+                REAL*8, DIMENSION(BANDWIDTH) :: storage
+                INTEGER :: i, j, a_min, a_max, b_min, b_max, s
+                REAL*8 :: temp
+                storage = 0
+
+        if (BANDWIDTH > 0) THEN
+        DO i=1,N_DIM
+                CALL MIN_BOUND(i, BANDWIDTH, a_min)
+                a_min = MAX(1, a_min)
+
+                CALL MAX_BOUND(i, BANDWIDTH, N_DIM, a_max)
+                a_max = MIN(M_DIM, a_max)
+
+                b_min = MAX(1, i-BANDWIDTH)
+                b_max = MIN(N_DIM, i+BANDWIDTH)
+
+                s = MOD(i-1, BANDWIDTH)+1
+
+                CALL MAT_VEC_DOT(A,B,i,a_min,a_max,b_min,b_max,temp)
+
+        IF (i > BANDWIDTH) THEN
+                B(i - BANDWIDTH) = storage(s)
+
+        END IF
+                storage(s) = temp
+                
+        END DO
+
+        DO i=1,BANDWIDTH
+                j = MOD(BANDWIDTH+s-i-1, BANDWIDTH)+1
+                B(N_DIM-(BANDWIDTH)+i) = storage(j)
+        END DO
+        ELSE 
+        DO i=1,N_DIM
+                B(i) = A(i,1) * B(i)
+        END DO
+        END IF
+
+        END SUBROUTINE
+        
+        SUBROUTINE BANDED_MULT_OUTPUT(A,B,N_DIM,M_DIM,BANDWIDTH,OUT)
+                USE DOT
+                INTEGER, INTENT(IN) :: N_DIM, M_DIM, BANDWIDTH
+                REAL*8, DIMENSION(N_DIM,M_DIM), INTENT(IN) :: A
+                REAL*8, DIMENSION(N_DIM), INTENT(IN) :: B
+                REAL*8, DIMENSION(N_DIM), INTENT(OUT) :: OUT
+
+                REAL*8, DIMENSION(BANDWIDTH) :: storage
+                INTEGER :: i, j, a_min, a_max, b_min, b_max, s
+                storage = 0
+
+        if (BANDWIDTH > 0) THEN
+        DO i=1,N_DIM
+                CALL MIN_BOUND(i, BANDWIDTH, a_min)
+                a_min = MAX(1, a_min)
+
+                CALL MAX_BOUND(i, BANDWIDTH, N_DIM, a_max)
+                a_max = MIN(M_DIM, a_max)
+
+                b_min = MAX(1, i-BANDWIDTH)
+                b_max = MIN(N_DIM, i+BANDWIDTH)
+
+                CALL MAT_VEC_DOT(A,B,i,a_min,a_max,b_min,b_max,OUT(i))
+
+        END DO
+        ELSE 
+        DO i=1,N_DIM
+                OUT(i) = A(i,1) * B(i)
+        END DO
+        END IF
+        END SUBROUTINE
+
+        SUBROUTINE MIN_BOUND(i, BANDWIDTH, j_min)
+                INTEGER, INTENT(IN) :: i, BANDWIDTH
+                INTEGER, INTENT(OUT) :: j_min
+
+                j_min = 2 + BANDWIDTH - i
+
+        END SUBROUTINE
+
+        SUBROUTINE MAX_BOUND(i, BANDWIDTH, N_DIM, j_max)
+                INTEGER, INTENT(IN) :: i, BANDWIDTH, N_DIM
+                INTEGER, INTENT(OUT) :: j_max
+
+                j_max = BANDWIDTH + N_DIM + 1 - i
         END SUBROUTINE
