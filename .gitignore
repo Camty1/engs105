@@ -3,8 +3,9 @@
 !*.*
 !*/
 
-# Ignore fotran object files
+# Ignore fotran object and module files
 *.o
+*.mod
 
 # Ignore MATLAB autosave files
 *.asv
