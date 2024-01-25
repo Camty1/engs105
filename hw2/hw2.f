@@ -1,46 +1,58 @@
         PROGRAM hw2
         IMPLICIT REAL*8 (A-H, O-Z)
 
-        INTEGER, PARAMETER :: N = 100
-        REAL*8, PARAMETER :: alpha = 1.0, threshold = 1E-5
+        INTEGER, PARAMETER :: N = 10, k = 3
+        REAL*8, PARAMETER :: alpha = .01, threshold = 1E-5
+        REAL*8, PARAMETER :: r_min = 0.1, r_max = 1, theta_min = 0
+        REAL*8, PARAMETER :: theta_max = 1.570796326794897
+        REAL*8, PARAMETER :: sigma = 1.0, I0 = 1.0
         
         REAL*8, DIMENSION(N) :: r_array, theta_array
         REAL*8, DIMENSION(N**2) :: U_jac1,U_jac2,U_gs,U_sor,U_true
         REAL*8, DIMENSION(N**2, 1) :: diag
-        REAL*8, DIMENSION(N**2, 2*N+1) :: coeff_mat, lower, upper
         REAL*8, DIMENSION(100**2) :: U_100
+        REAL*8, DIMENSION(50000) :: error_storage
 
-        INTEGER :: i
-        REAL*8 :: err, sigma, I0
+        INTEGER :: i, j
+        REAL*8 :: err, last_err, step
+
+        CHARACTER(len=50) :: filename
         
-        sigma = 1.0
-        I0 = 1.0
-
-        coeff_mat = 0.0
-        Y = 0.0
-
+        error_storage = 0
+        
         U_jac1 = 0.0
         U_jac2 = 0.0
         U_gs = 0.0
         U_sor = 0.0
 
-        OPEN(1, file="output/u100_1.dat")
+        CALL linspace(r_min, r_max, N, r_array)
+        CALL linspace(theta_min, theta_max, N, theta_array)
+
+        CALL INITIAL_GUESS(N, k, I0, sigma, r_array, theta_array, U_jac1)
+        CALL INITIAL_GUESS(N, k, I0, sigma, r_array, theta_array, U_jac2)
+        CALL INITIAL_GUESS(N, k, I0, sigma, r_array, theta_array, U_gs)
+        CALL INITIAL_GUESS(N, k, I0, sigma, r_array, theta_array, U_sor)
+
+        WRITE(filename, '("./output/u100_", ES7.1, ".dat" )') alpha
+        OPEN(1, file=filename)
         READ(1,*) U_100
         CLOSE(1)
 
-        OPEN(1, file="output/u020_1.dat")
-
+        WRITE(filename, '("./output/u", I3.3, "_", ES7.1, ".dat")') N, alpha
+        OPEN(1, file=filename)
         DO i=1,N**2
                 CALL INTERP_TRUE(i, U_100, N, 100, U_true(i))
                 WRITE(1,*) U_true(i)
         END DO
-        U = 0
         CLOSE(1)
         
         CALL CALC_ERROR(U_jac1, U_true, N**2, err)
-        PRINT *, err
+        error_storage(1) = err
+        
+        last_err = 1000.0
         iteration_counter = 0
-        DO WHILE (err > threshold)
+        DO WHILE (ABS(err - last_err) > threshold)
+                last_err = err
                 iteration_counter = iteration_counter + 1
                 IF (MOD(iteration_counter, 2) == 1) THEN
                         CALL JACOBI(r_array, theta_array, alpha, N, k, I0, sigma, U_jac1, U_jac2)
@@ -49,9 +61,97 @@
                         CALL JACOBI(r_array, theta_array, alpha, N, k, I0, sigma, U_jac2, U_jac1)
                         CALL CALC_ERROR(U_jac1, U_true, N**2, err)
                 END IF
-                PRINT *, err
+                error_storage(iteration_counter+1) = err
         END DO
 
+        print *, iteration_counter
+        print *, error_storage(iteration_counter+1)
+        
+        WRITE(filename, '("./output/err_jac", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,iteration_counter+1
+                WRITE(1,*) error_storage(i)
+        END DO
+        CLOSE(1)
+
+        WRITE(filename, '("./output/u_jac", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,N**2
+                IF (MOD(iteration_counter, 2) == 1) THEN
+                        WRITE(1,*) u_jac2(i)
+                ELSE 
+                        WRITE(1,*) u_jac1(i)
+                END IF
+        END DO
+        CLOSE(1)
+
+        error_storage = 0
+        CALL CALC_ERROR(U_gs, U_true, N**2, err)
+        error_storage(1) = err
+        
+        last_err = 1000.0
+        iteration_counter = 0
+        DO WHILE (ABS(err - last_err) > threshold)
+                last_err = err
+                iteration_counter = iteration_counter + 1
+                CALL GAUSS_SIDEL(r_array, theta_array, alpha, N, k, I0, sigma, U_gs)
+                CALL CALC_ERROR(U_gs, U_true, N**2, err)
+                error_storage(iteration_counter+1) = err
+        END DO
+
+        print *, iteration_counter
+        print *, error_storage(iteration_counter+1)
+        
+        WRITE(filename, '("./output/err_gs", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,iteration_counter+1
+                WRITE(1,*) error_storage(i)
+        END DO
+        CLOSE(1)
+
+        WRITE(filename, '("./output/u_gs", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,N**2
+                WRITE(1,*) u_gs(i)
+        END DO
+        CLOSE(1)
+
+        error_storage = 0
+        CALL CALC_ERROR(U_sor, U_true, N**2, err)
+        error_storage(1) = err
+        
+        last_err = 1000.0
+        iteration_counter = 0
+        DO WHILE (ABS(err - last_err) > threshold)
+                last_err = err
+                iteration_counter = iteration_counter + 1
+                CALL SOR(DBLE(1.6), r_array, theta_array, alpha, N, k, I0, sigma, U_sor)
+                CALL CALC_ERROR(U_sor, U_true, N**2, err)
+                error_storage(iteration_counter+1) = err
+        END DO
+
+        print *, iteration_counter
+        print *, error_storage(iteration_counter+1)
+        
+        WRITE(filename, '("./output/err_sor", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,iteration_counter+1
+                WRITE(1,*) error_storage(i)
+        END DO
+        CLOSE(1)
+
+        WRITE(filename, '("./output/u_sor", I3.3, "_", ES7.1, ".dat" )') N, alpha
+
+        OPEN(1, file=filename)
+        DO i=1,N**2
+                WRITE(1,*) u_sor(i)
+        END DO
+        CLOSE(1)
         END PROGRAM hw2
 
         SUBROUTINE GEN_SYS_EQNS(N, alpha, COEFF, Y)
@@ -189,6 +289,23 @@
                 
         END SUBROUTINE
 
+        SUBROUTINE INITIAL_GUESS(N, k, I0, sigma, r_array, theta_array, U)
+                INTEGER, INTENT(IN) :: N, k
+                REAL*8, INTENT(IN) :: I0, sigma
+                REAL*8, DIMENSION(N), INTENT(IN) :: r_array, theta_array
+                REAL*8, DIMENSION(N**2), INTENT(OUT) :: U
+
+                INTEGER :: idx
+
+                DO j=1,N
+                DO i=1,N
+                        idx = N * (j - 1) + i
+                        U(idx) = -I0/sigma * r_array(i) * COS(k * theta_array(j))
+                END DO
+                END DO
+
+        END SUBROUTINE
+
         SUBROUTINE bc(k, I0, sigma, R, theta, f)
                 INTEGER, INTENT(IN) :: k
                 REAL*8, INTENT(IN) :: I0, sigma, R, theta
@@ -268,7 +385,7 @@
         END SUBROUTINE
 
         SUBROUTINE JACOBI(r_arr,theta_arr,alpha,N,k,I0,sigma,U,U_new)
-                REAL*8, DIMENSION(N**2),INTENT(IN) :: r_arr,theta_arr
+                REAL*8, DIMENSION(N),INTENT(IN) :: r_arr,theta_arr
                 REAL*8, DIMENSION(N**2), INTENT(IN) :: U
                 REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U_new
                 INTEGER, INTENT(IN) :: N, k
@@ -277,76 +394,46 @@
                 INTEGER :: i, j, idx
                 REAL*8 :: A, B, C, D, E, f, g
                 REAL*8 :: dr, dtheta
-
+                
                 dr = r_arr(2)-r_arr(1)
                 dtheta = theta_arr(2)-theta_arr(1)
 
-                DO i=1,N
                 DO j=1,N
+                DO i=1,N
                         
                 CALL get_A(r_arr(i), dr, dtheta, A)
                 CALL get_B(r_arr(i), dr, dtheta, B)
                 CALL get_C(r_arr(i), dr, dtheta, C)
                 CALL get_D(r_arr(i), D)
+                CALL get_E(r_arr(i), dtheta, alpha, E)
+                CALL bc(k,I0,sigma,DBLE(1.0),theta_arr(j),f)
+                CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
 
                 idx = (j-1)*N+i
 
                 IF (i == 1 .and. j == 1) THEN
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-
-                        U_new(idx) = -((A + B) * U(idx + N) + 2 * D * U(idx + 1)) / C
-
+                        U_new(idx) = (-(A + B) * U(idx + 1) - 2 * D * U(idx + N)) / C
+                        !PRINT *, idx, i, j, 1, U_new(idx)
+                ELSE IF (i == 1 .and. 1 < j .and. j < N) THEN
+                        U_new(idx) = (-(A + B) * U(idx + 1) - D * (U(idx - N) + U(idx + N))) / C
+                        !PRINT *, idx, i, j, 2, U_new(idx)
                 ELSE IF (i == 1 .and. j == N) THEN
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-                        CALL get_E(r_arr(i), dtheta, alpha, E)
-                        CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
-                        
-                        U_new(idx) = (-((A + B) * U(idx + 1) + 2 * D * U(idx - N)) - g * D)/(C + E * D)
-
-                ELSE IF (i == 1) THEN
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-
-                        U_new(idx) = -((A + B) * U(idx + 1) + D * (U(idx - N) + U(idx + N))) / C
-                        
+                        U_new(idx) = (-(A + B) * U(idx + 1) - 2 * D * U(idx - N) - g * D) / (C + E * D)
+                        !PRINT *, idx, i, j, 3, U_new(idx)
+                ELSE IF (1 < i .and. i < N .and. j == 1) THEN
+                        U_new(idx) = (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx + N)) / C
+                        !PRINT *, idx, i, j, 4, U_new(idx)
+                ELSE IF (1 < i .and. i < N .and. 1 < j .and. j < N) THEN
+                        U_new(idx) = (-A * U(idx + 1) - B * U(idx - 1) - D * (U(idx + N) + U(idx - N))) / C
+                        !PRINT *, idx, i, j, 5, U_new(idx)
+                ELSE IF (1 < i .and. i < N .and. j == N) THEN
+                        U_new(idx) = (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx - N) - g * D) / (C + E * D)
+                        !PRINT *, idx, i, j, 6, U_new(idx)
                 ELSE IF (i == N) THEN
-                        CALL bc(k, I0, sigma, DBLE(1.0), theta_arr(j), U_new(idx))
-                         
-                        
-                ELSE IF (j == 1) THEN
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-
-                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + 2 * D * U(idx + N)) / C
-
-                ELSE IF (j == N) THEN
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-                        CALL get_E(r_arr(i), dtheta, alpha, E)
-                        CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
-
-                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + 2 * D * U(idx - N) + g * D) / (C + E * D)
-
+                        U_new(idx) = f
+                        !PRINT *, idx, i, j, 7, U_new(idx)
                 ELSE
-                        CALL get_A(r_arr(i), dr, dtheta, A)
-                        CALL get_B(r_arr(i), dr, dtheta, B)
-                        CALL get_C(r_arr(i), dr, dtheta, C)
-                        CALL get_D(r_arr(i), D)
-
-                        U_new(idx) = -(A * U(idx + 1) + B * U(idx - 1) + D * (U(idx - N) + U(idx + N))) / C
-
+                        PRINT *, idx, i, j, "bongo"
                 END IF
 
                 END DO
@@ -354,24 +441,116 @@
                         
         END SUBROUTINE
 
-        SUBROUTINE GAUSS_SIDEL(diag, lower, upper, Y, N, U)
-                REAL*8, DIMENSION(N**2,1), INTENT(IN) :: diag
-                INTEGER, INTENT(IN) :: N
-                REAL*8, DIMENSION(N**2,2*N+1),INTENT(IN) :: lower, upper
-                REAL*8, DIMENSION(N**2), INTENT(IN) :: Y
+        SUBROUTINE GAUSS_SIDEL(r_arr,theta_arr,alpha,N,k,I0,sigma,U)
+                REAL*8, DIMENSION(N),INTENT(IN) :: r_arr,theta_arr
                 REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U
-                REAL*8, DIMENSION(N**2,2*N+1) :: lhs
+                INTEGER, INTENT(IN) :: N, k
+                REAL*8, INTENT(IN) :: alpha, I0, sigma
 
-                CALL BANDED_MULT_IN_PLACE(-upper,U,N**2,2*N+1,N)
+                INTEGER :: i, j, idx
+                REAL*8 :: A, B, C, D, E, f, g
+                REAL*8 :: dr, dtheta
+                
+                dr = r_arr(2)-r_arr(1)
+                dtheta = theta_arr(2)-theta_arr(1)
 
-                U = U + Y
-                lhs = lower
-                DO i=1,N**2
-                        lhs(i, N+1) = diag(i,1)
+                DO j=1,N
+                DO i=1,N
+                        
+                CALL get_A(r_arr(i), dr, dtheta, A)
+                CALL get_B(r_arr(i), dr, dtheta, B)
+                CALL get_C(r_arr(i), dr, dtheta, C)
+                CALL get_D(r_arr(i), D)
+                CALL get_E(r_arr(i), dtheta, alpha, E)
+                CALL bc(k,I0,sigma,DBLE(1.0),theta_arr(j),f)
+                CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
+
+                idx = (j-1)*N+i
+
+                IF (i == 1 .and. j == 1) THEN
+                        U(idx) = (-(A + B) * U(idx + 1) - 2 * D * U(idx + N)) / C
+                        !PRINT *, idx, i, j, 1, U(idx)
+                ELSE IF (i == 1 .and. 1 < j .and. j < N) THEN
+                        U(idx) = (-(A + B) * U(idx + 1) - D * (U(idx - N) + U(idx + N))) / C
+                        !PRINT *, idx, i, j, 2, U(idx)
+                ELSE IF (i == 1 .and. j == N) THEN
+                        U(idx) = (-(A + B) * U(idx + 1) - 2 * D * U(idx - N) - g * D) / (C + E * D)
+                        !PRINT *, idx, i, j, 3, U(idx)
+                ELSE IF (1 < i .and. i < N .and. j == 1) THEN
+                        U(idx) = (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx + N)) / C
+                        !PRINT *, idx, i, j, 4, U(idx)
+                ELSE IF (1 < i .and. i < N .and. 1 < j .and. j < N) THEN
+                        U(idx) = (-A * U(idx + 1) - B * U(idx - 1) - D * (U(idx + N) + U(idx - N))) / C
+                        !PRINT *, idx, i, j, 5, U(idx)
+                ELSE IF (1 < i .and. i < N .and. j == N) THEN
+                        U(idx) = (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx - N) - g * D) / (C + E * D)
+                        !PRINT *, idx, i, j, 6, U(idx)
+                ELSE IF (i == N) THEN
+                        U(idx) = f
+                        !PRINT *, idx, i, j, 7, U(idx)
+                ELSE
+                        PRINT *, idx, i, j, "bongo"
+                END IF
+
                 END DO
+                END DO
+                        
+        END SUBROUTINE
 
-                CALL DSOLVE(3, lhs, U, N, 0, N, 1)
+        SUBROUTINE SOR(w, r_arr,theta_arr,alpha,N,k,I0,sigma,U)
+                REAL*8, DIMENSION(N),INTENT(IN) :: r_arr,theta_arr
+                REAL*8, DIMENSION(N**2), INTENT(INOUT) :: U
+                INTEGER, INTENT(IN) :: N, k
+                REAL*8, INTENT(IN) :: w, alpha, I0, sigma
 
+                INTEGER :: i, j, idx
+                REAL*8 :: A, B, C, D, E, f, g
+                REAL*8 :: dr, dtheta
+                
+                dr = r_arr(2)-r_arr(1)
+                dtheta = theta_arr(2)-theta_arr(1)
+
+                DO j=1,N
+                DO i=1,N
+                        
+                CALL get_A(r_arr(i), dr, dtheta, A)
+                CALL get_B(r_arr(i), dr, dtheta, B)
+                CALL get_C(r_arr(i), dr, dtheta, C)
+                CALL get_D(r_arr(i), D)
+                CALL get_E(r_arr(i), dtheta, alpha, E)
+                CALL bc(k,I0,sigma,DBLE(1.0),theta_arr(j),f)
+                CALL get_g(r_arr(i), dtheta, k, I0, sigma, g)
+
+                idx = (j-1)*N+i
+
+                IF (i == 1 .and. j == 1) THEN
+                        U(idx) = w * (-(A + B) * U(idx + 1) - 2 * D * U(idx + N)) / C + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 1, U(idx)
+                ELSE IF (i == 1 .and. 1 < j .and. j < N) THEN
+                        U(idx) = w * (-(A + B) * U(idx + 1) - D * (U(idx - N) + U(idx + N))) / C + (1 - w) * U(idx) 
+                        !PRINT *, idx, i, j, 2, U(idx)
+                ELSE IF (i == 1 .and. j == N) THEN
+                        U(idx) = w * (-(A + B) * U(idx + 1) - 2 * D * U(idx - N) - g * D) / (C + E * D) + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 3, U(idx)
+                ELSE IF (1 < i .and. i < N .and. j == 1) THEN
+                        U(idx) = w * (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx + N)) / C + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 4, U(idx)
+                ELSE IF (1 < i .and. i < N .and. 1 < j .and. j < N) THEN
+                        U(idx) = w * (-A * U(idx + 1) - B * U(idx - 1) - D * (U(idx + N) + U(idx - N))) / C + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 5, U(idx)
+                ELSE IF (1 < i .and. i < N .and. j == N) THEN
+                        U(idx) = w * (-A * U(idx + 1) - B * U(idx - 1) - 2 * D * U(idx - N) - g * D) / (C + E * D) + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 6, U(idx)
+                ELSE IF (i == N) THEN
+                        U(idx) = w * f + (1 - w) * U(idx)
+                        !PRINT *, idx, i, j, 7, U(idx)
+                ELSE
+                        PRINT *, idx, i, j, "bongo"
+                END IF
+
+                END DO
+                END DO
+                        
         END SUBROUTINE
 
         SUBROUTINE CALC_ERROR(U, U_TRUE, N, err)
