@@ -686,3 +686,88 @@ colorbar;
 
 title(tcl, "SOR Error Contours for N = 10, 20, 40, and A = 0.001, 1, 100");
 saveas(gcf, "figures/e_sor.png");
+
+%% Spectral Radius
+rho_jac_10_1_arr = err_jac_10_1(2:end) ./ err_jac_10_1(1:end-1);
+rho_jac_10_100_arr = err_jac_10_100(2:end) ./ err_jac_10_100(1:end-1);
+rho_jac_10_001_arr = err_jac_10_001(2:end) ./ err_jac_10_001(1:end-1);
+
+rho_jac_20_1_arr = err_jac_20_1(2:end) ./ err_jac_20_1(1:end-1);
+rho_jac_20_100_arr = err_jac_20_100(2:end) ./ err_jac_20_100(1:end-1);
+rho_jac_20_001_arr = err_jac_20_001(2:end) ./ err_jac_20_001(1:end-1);
+
+rho_jac_40_1_arr = err_jac_40_1(2:end) ./ err_jac_40_1(1:end-1);
+rho_jac_40_100_arr = err_jac_40_100(2:end) ./ err_jac_40_100(1:end-1);
+rho_jac_40_001_arr = err_jac_40_001(2:end) ./ err_jac_40_001(1:end-1);
+
+rho_gs_10_1_arr = err_gs_10_1(2:end) ./ err_gs_10_1(1:end-1);
+rho_gs_10_100_arr = err_gs_10_100(2:end) ./ err_gs_10_100(1:end-1);
+rho_gs_10_001_arr = err_gs_10_001(2:end) ./ err_gs_10_001(1:end-1);
+
+rho_gs_20_1_arr = err_gs_20_1(2:end) ./ err_gs_20_1(1:end-1);
+rho_gs_20_100_arr = err_gs_20_100(2:end) ./ err_gs_20_100(1:end-1);
+rho_gs_20_001_arr = err_gs_20_001(2:end) ./ err_gs_20_001(1:end-1);
+
+rho_gs_40_1_arr = err_gs_40_1(2:end) ./ err_gs_40_1(1:end-1);
+rho_gs_40_100_arr = err_gs_40_100(2:end) ./ err_gs_40_100(1:end-1);
+rho_gs_40_001_arr = err_gs_40_001(2:end) ./ err_gs_40_001(1:end-1);
+
+rho_sor_10_1_arr = err_sor_10_1(2:end) ./ err_sor_10_1(1:end-1);
+rho_sor_10_100_arr = err_sor_10_100(2:end) ./ err_sor_10_100(1:end-1);
+rho_sor_10_001_arr = err_sor_10_001(2:end) ./ err_sor_10_001(1:end-1);
+
+rho_sor_20_1_arr = err_sor_20_1(2:end) ./ err_sor_20_1(1:end-1);
+rho_sor_20_100_arr = err_sor_20_100(2:end) ./ err_sor_20_100(1:end-1);
+rho_sor_20_001_arr = err_sor_20_001(2:end) ./ err_sor_20_001(1:end-1);
+
+rho_sor_40_1_arr = err_sor_40_1(2:end) ./ err_sor_40_1(1:end-1);
+rho_sor_40_100_arr = err_sor_40_100(2:end) ./ err_sor_40_100(1:end-1);
+rho_sor_40_001_arr = err_sor_40_001(2:end) ./ err_sor_40_001(1:end-1);
+
+rho_jac_10_1 = mean(quantile(rho_jac_10_1_arr(rho_jac_10_1_arr < 1), [0.25, 0.75]));
+rho_jac_10_100 = mean(quantile(rho_jac_10_100_arr(rho_jac_10_100_arr < 1), [0.25, 0.75]));
+rho_jac_10_001 = mean(quantile(rho_jac_10_001_arr(rho_jac_10_001_arr < 1), [0.25, 0.75]));
+
+rho_jac_20_1 = mean(quantile(rho_jac_20_1_arr(rho_jac_20_1_arr < 1), [0.25, 0.75]));
+rho_jac_20_100 = mean(quantile(rho_jac_20_100_arr(rho_jac_20_100_arr < 1), [0.25, 0.75]));
+rho_jac_20_001 = mean(quantile(rho_jac_20_001_arr(rho_jac_20_001_arr < 1), [0.25, 0.75]));
+
+rho_jac_40_1 = mean(quantile(rho_jac_40_1_arr(rho_jac_40_1_arr < 1), [0.25, 0.75]));
+rho_jac_40_100 = mean(quantile(rho_jac_40_100_arr(rho_jac_40_100_arr < 1), [0.25, 0.75]));
+rho_jac_40_001 = mean(quantile(rho_jac_40_001_arr(rho_jac_40_001_arr < 1), [0.25, 0.75]));
+
+rho_gs_10_1 = mean(quantile(rho_gs_10_1_arr(rho_gs_10_1_arr < 1), [0.25, 0.75]));
+rho_gs_10_100 = mean(quantile(rho_gs_10_100_arr(rho_gs_10_100_arr < 1), [0.25, 0.75]));
+rho_gs_10_001 = mean(quantile(rho_gs_10_001_arr(rho_gs_10_001_arr < 1), [0.25, 0.75]));
+
+rho_gs_20_1 = mean(quantile(rho_gs_20_1_arr(rho_gs_20_1_arr < 1), [0.25, 0.75]));
+rho_gs_20_100 = mean(quantile(rho_gs_20_100_arr(rho_gs_20_100_arr < 1), [0.25, 0.75]));
+rho_gs_20_001 = mean(quantile(rho_gs_20_001_arr(rho_gs_20_001_arr < 1), [0.25, 0.75]));
+
+rho_gs_40_1 = mean(quantile(rho_gs_40_1_arr(rho_gs_40_1_arr < 1), [0.25, 0.75]));
+rho_gs_40_100 = mean(quantile(rho_gs_40_100_arr(rho_gs_40_100_arr < 1), [0.25, 0.75]));
+rho_gs_40_001 = mean(quantile(rho_gs_40_001_arr(rho_gs_40_001_arr < 1), [0.25, 0.75]));
+
+rho_sor_10_1 = mean(quantile(rho_sor_10_1_arr(rho_sor_10_1_arr < 1), [0.25, 0.75]));
+rho_sor_10_100 = mean(quantile(rho_sor_10_100_arr(rho_sor_10_100_arr < 1), [0.25, 0.75]));
+rho_sor_10_001 = mean(quantile(rho_sor_10_001_arr(rho_sor_10_001_arr < 1), [0.25, 0.75]));
+
+rho_sor_20_1 = mean(quantile(rho_sor_20_1_arr(rho_sor_20_1_arr < 1), [0.25, 0.75]));
+rho_sor_20_100 = mean(quantile(rho_sor_20_100_arr(rho_sor_20_100_arr < 1), [0.25, 0.75]));
+rho_sor_20_001 = mean(quantile(rho_sor_20_001_arr(rho_sor_20_001_arr < 1), [0.25, 0.75]));
+
+rho_sor_40_1 = mean(quantile(rho_sor_40_1_arr(rho_sor_40_1_arr < 1), [0.25, 0.75]));
+rho_sor_40_100 = mean(quantile(rho_sor_40_100_arr(rho_sor_40_100_arr < 1), [0.25, 0.75]));
+rho_sor_40_001 = mean(quantile(rho_sor_40_001_arr(rho_sor_40_001_arr < 1), [0.25, 0.75]));
+
+disp([rho_jac_10_1, rho_jac_10_100, rho_jac_10_001]);
+disp([rho_jac_20_1, rho_jac_20_100, rho_jac_20_001]);
+disp([rho_jac_40_1, rho_jac_40_100, rho_jac_40_001]);
+
+disp([rho_gs_10_1, rho_gs_10_100, rho_gs_10_001]);
+disp([rho_gs_20_1, rho_gs_20_100, rho_gs_20_001]);
+disp([rho_gs_40_1, rho_gs_40_100, rho_gs_40_001]);
+
+disp([rho_sor_10_1, rho_sor_10_100, rho_sor_10_001]);
+disp([rho_sor_20_1, rho_sor_20_100, rho_sor_20_001]);
+disp([rho_sor_40_1, rho_sor_40_100, rho_sor_40_001]);
