@@ -85,3 +85,31 @@ for i=1:5
 		
 	end
 end
+
+u_ss_1 = readmatrix(sprintf('output/u_ss_1_%03d.dat', N));
+u_transient_1 = readmatrix(sprintf('output/u_transient_%d_%03d_%7.1E_%7.1E_%d.dat', 1, N, theta(5), r(5), D))';
+
+u_ss_3 = readmatrix(sprintf('output/u_ss_3_%03d.dat', N));
+u_transient_3 = readmatrix(sprintf('output/u_transient_%d_%03d_%7.1E_%7.1E_%d.dat', 3, N, theta(5), r(5), D))';
+
+error_1 = zeros(size(u_transient_1));
+error_3 = zeros(size(u_transient_3));
+for i=1:size(u_transient_1, 2)
+	error_1(:,i) = abs(u_transient_1(:,i) - u_ss_1);
+	error_3(:,i) = abs(u_transient_3(:,i) - u_ss_3);
+end
+
+dt = r(5) * dr^2 / D;
+error_1 = error_1(mod(1:N^2, N) ~= 0, 1:200);
+
+ln_error_1 = log(error_1);
+delta_ln_error_1 = error_1(:,2:end) - error_1(:,1:end-1);
+tau_1 = abs(dt ./ ln_error_1);
+tau_1 = mean(tau_1(tau_1 > 1e-4), "all");
+
+error_3 = error_3(mod(1:N^2, N) ~= 0, 1:200);
+
+ln_error_3 = log(error_3);
+delta_ln_error_3 = error_3(:,2:end) - error_3(:,1:end-1);
+tau_3 = abs(dt ./ ln_error_3);
+tau_3 = mean(tau_3(tau_1 > 1e-4), "all");

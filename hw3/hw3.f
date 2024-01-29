@@ -5,9 +5,9 @@
         REAL*8, PARAMETER :: r_min = 0.1, r_max = 1, phi_min = 0
         REAL*8, PARAMETER :: phi_max = 1.570796326794897
         REAL*8, PARAMETER :: sigma = 1.0, I0 = 1.0
-        REAL*8, PARAMETER :: theta = 0.0, rich = 0.25
+        REAL*8, PARAMETER :: theta = 0.0, rich = 0.1
         REAL*8, PARAMETER :: alpha = 1.0
-        LOGICAL, PARAMETER :: TYPE_III = .TRUE.
+        LOGICAL, PARAMETER :: TYPE_III = .FALSE.
         
         REAL*8, DIMENSION(N) :: r_arr, phi_arr
         REAL*8, DIMENSION(N**2) :: U, U_new, b_vec
