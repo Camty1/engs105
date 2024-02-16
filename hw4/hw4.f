@@ -13,11 +13,13 @@
                 REAL*8, DIMENSION(NUM_NODES, 2*BANDWIDTH+1) :: band_coeff
                 REAL*8, DIMENSION(NUM_NODES) :: RHS
                 REAL*8, DIMENSION(3,3) :: elem_mat
+                REAL*8, DIMENSION(2, NUM_ELEMS) :: vel
 
                 REAL*8, DIMENSION(4, NUM_BC_NODES) :: bc_mat
                 
-                REAL*8 :: garbage1, garbage2, u_coeff, du_coeff, const
-                INTEGER :: i, j, k, garbage3
+                REAL*8 :: u_coeff, du_coeff, const
+                INTEGER :: i, j, k, row, col, new_col
+                CHARACTER(len=30) :: filename
 
                 OPEN(1, file="hw4.ele1")
                 READ(1,*) elem_tab_input
@@ -43,6 +45,8 @@
                 CLOSE(1)
 
                 coeff = 0
+                band_coeff = 0
+
                 DO i=1,NUM_ELEMS
                         x_elem(1,i) = node_pos(1,elem_tab(1,i))
                         x_elem(2,i) = node_pos(1,elem_tab(2,i))
@@ -61,14 +65,19 @@
                         DO j=1,3
                         DO k=1,3
 
-                        coeff(elem_tab(j, i), elem_tab(k, i)) = coeff(elem_tab(j, i), elem_tab(k, i)) + elem_mat(j,k)
+                        row = elem_tab(j, i)
+                        col = elem_tab(k, i)
+
+                        CALL mode2_index_map(row, col, BANDWIDTH, new_col)
+
+                        band_coeff(row, new_col) = band_coeff(row, new_col) + elem_mat(j,k)
 
                         END DO
                         END DO
                         
                 END DO
 
-                OPEN(1, file="output/coeff.dat")
+                OPEN(1, file="output/banded_coeff.dat")
                 OPEN(2, file="output/rhs.dat")
 
                 RHS = 0
@@ -82,21 +91,53 @@
                         ! Type I BC
                         ELSE IF (du_coeff == 0) THEN
                                 RHS(i) = const
-                                coeff(i, :) = 0
-                                coeff(i, i) = u_coeff
+                                band_coeff(i, :) = 0
+                                band_coeff(i, BANDWIDTH + 1) = u_coeff
                         
                         ! Type II or III BC
                         ELSE
-                                RHS(i) = const / du_coeff
-                                coeff(i, :) = -u_coeff / du_coeff
+                                RHS(i) = RHS(i) + const / du_coeff
+                                band_coeff(i, BANDWIDTH + 1) = band_coeff(i, BANDWIDTH + 1) - u_coeff / du_coeff
+
                         END IF
 
-                        WRITE(1, '( *(g0, ",") )') coeff(i,:)
+                        WRITE(1, '( *(g0, ",") )') band_coeff(i,:)
                         WRITE(2, *) RHS(i)
                 END DO
 
                 CLOSE(1)
                 CLOSE(2)
+
+                CALL DSOLVE(3, band_coeff, RHS, NUM_NODES, BANDWIDTH, NUM_NODES, 2*BANDWIDTH+1)
+                
+                WRITE(filename, '("output/u_", I1, ".dat")') PART
+
+                OPEN(1, file=filename)
+                DO i=1,NUM_NODES
+                        WRITE(1, '(g0)') RHS(i)
+                END DO
+
+                CLOSE(1)
+                WRITE(filename, '("output/v_", I1, ".dat")') PART
+                OPEN(1, file=filename)
+
+                ! x_vel = du/dy, y_vel = -du/dx
+                vel = 0
+                DO i=1,NUM_ELEMS
+                DO j=1,3
+                        
+                        vel(1, i) = vel(1, i) - RHS(elem_tab(j, i)) * dx_elem(j, i) / (2 * A_elem(i))
+                        vel(2, i) = vel(2, i) - RHS(elem_tab(j, i)) * dy_elem(j, i) / (2 * A_elem(i))
+
+                END DO
+
+                        WRITE(1, '( *(g0, ",") )') vel(:, i)
+
+                END DO
+
+                CLOSE(1)
+
+
 
         END PROGRAM
 
