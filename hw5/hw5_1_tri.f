@@ -1,5 +1,5 @@
       PROGRAM HW5
-            INTEGER, PARAMETER :: NUM_ELEM=1089, NUM_NODE=969, NUM_BC=64, NUM_MAT=8
+            INTEGER, PARAMETER :: NUM_ELEM=1872, NUM_NODE=969, NUM_BC=64, NUM_MAT=8
 
             INTEGER, DIMENSION(6, NUM_ELEM) :: elem_list_input
             INTEGER, DIMENSION(4, NUM_ELEM) :: elem_list
@@ -32,11 +32,11 @@
 
             REAL*8, DIMENSION(4, NUM_ELEM) :: x_elem, y_elem, sigmaE
             REAL*8, DIMENSION(3) :: dx, dy
-            REAL*8 :: A, kappa, m, h, ta, L1, L2
+            REAL*8 :: A, kappa, m
 
-            INTEGER :: i, j, k, l, bandwidth, width, row, col, new_col, node, prev_node, next_node
+            INTEGER :: i, j, k, l, bandwidth, width, row, col, new_col
 
-            OPEN(1, file="epeltr4.dat")
+            OPEN(1, file="epeltr4_tri.dat")
             READ(1, *) elem_list_input
             CLOSE(1)
             
@@ -48,7 +48,7 @@
             READ(1, *) bc_list_input
             CLOSE(1)
 
-            OPEN(1, file="bpelt4.dat")
+            OPEN(1, file="bpelt4_tri.dat")
             READ(1, *) heat_rate_list_input
             CLOSE(1)
 
@@ -62,8 +62,8 @@
             node_pos = node_pos_input(2:3, :)
 
             bc_nodes = INT(bc_list_input(2, :))
-            bc_prev_nodes = INT(bc_list_input(5, :))
-            bc_next_nodes = INT(bc_list_input(4, :))
+            bc_prev_nodes = INT(bc_list_input(4, :))
+            bc_next_nodes = INT(bc_list_input(5, :))
             bc_h = bc_list_input(6,:)
             bc_ta = bc_list_input(7,:)
 
@@ -156,45 +156,21 @@
 
             DO i=1,NUM_BC
 
-            node = bc_nodes(i)
-            prev_node = bc_prev_nodes(i)
-            next_node = bc_next_nodes(i)
-            h = bc_h(i)
-            ta = bc_ta(i)
-            
-            L1 = sqrt((node_pos(1, node) - node_pos(1, prev_node)) ** 2 + (node_pos(2, node) - node_pos(2, prev_node)) ** 2)
-            L2 = sqrt((node_pos(1, node) - node_pos(1, next_node)) ** 2 + (node_pos(2, node) - node_pos(2, next_node)) ** 2)
-            
-
-            row = node
-            col = node
-
-            CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-
-            LHS(row, new_col) = LHS(row, new_col) + 2.0 * h / 6.0 * (L1 + L2)
-
-            col = prev_node
-            CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-
-            LHS(row, new_col) = LHS(row, new_col) + h / 6.0 * L1
-
-            col = next_node
-            CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-
-            LHS(row, new_col) = LHS(row, new_col) + h / 6.0 * L2
-            
-            RHS(row) = RHS(row) + h * ta / 2.0 * (L1 + L2)
+            row = bc_nodes(i)
+            LHS(row, :) = 0
+            LHS(row, bandwidth + 1) = 1
+            RHS(row) = 0
 
             END DO
 
-            OPEN(1, file="output/LHS_3_tri.dat")
+            OPEN(1, file="output/LHS_1_tri.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') LHS(i, :)
 
             END DO
             CLOSE(1)
 
-            OPEN(1, file="output/RHS_3_tri.dat")
+            OPEN(1, file="output/RHS_1_tri.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') RHS(i)
 
@@ -203,7 +179,7 @@
 
             CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth + 1)
             
-            OPEN(1, file="output/u_3_tri.dat")
+            OPEN(1, file="output/u_1_tri.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') RHS(i)
 

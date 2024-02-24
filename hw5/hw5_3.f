@@ -26,7 +26,6 @@
 
             REAL*8, DIMENSION(3,3) :: elem_mat_3
             REAL*8, DIMENSION(4,4) :: elem_mat_4
-            REAL*8, DIMENSION(4) :: tri_quad_points
             REAL*8, DIMENSION(3) :: b_vec_3
             REAL*8, DIMENSION(4) :: b_vec_4
 
@@ -187,14 +186,14 @@
 
             END DO
 
-            OPEN(1, file="output/LHS_3_tri.dat")
+            OPEN(1, file="output/LHS_3.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') LHS(i, :)
 
             END DO
             CLOSE(1)
 
-            OPEN(1, file="output/RHS_3_tri.dat")
+            OPEN(1, file="output/RHS_3.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') RHS(i)
 
@@ -203,7 +202,7 @@
 
             CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth + 1)
             
-            OPEN(1, file="output/u_3_tri.dat")
+            OPEN(1, file="output/u_3.dat")
             DO i=1,NUM_NODE
                   WRITE(1, '( *(g0, ",") )') RHS(i)
 
@@ -223,7 +222,7 @@
             REAL*8 :: jac_det, xi, nu, phi_i, phi_j, dphi_i_x, dphi_i_y, dphi_j_x, dphi_j_y 
             INTEGER :: i, j, k
 
-            quad_points = RESHAPE((/ -1/SQRT(3.0), -1/SQRT(3.0), 1/SQRT(3.0), -1/SQRT(3.0), 1/SQRT(3.0), 1/SQRT(3.0), 1/SQRT(3.0), -1/SQRT(3.0) /), SHAPE(quad_points))
+            quad_points = RESHAPE((/ -1/SQRT(DBLE(3)), -1/SQRT(DBLE(3)), 1/SQRT(DBLE(3)), -1/SQRT(DBLE(3)), 1/SQRT(DBLE(3)), 1/SQRT(DBLE(3)), 1/SQRT(DBLE(3)), -1/SQRT(DBLE(3)) /), SHAPE(quad_points))
 
             elem_mat = 0
             elem_b = 0
@@ -235,8 +234,8 @@
                   nu = quad_points(2, k)
 
                   CALL GET_JAC(x, y, xi, nu, jac, jac_inv, jac_det)
-                  CALL GET_QUAD(xi, nu, jac_inv, i, phi_i, dphi_i_x, dphi_i_y)
-                  CALL GET_QUAD(xi, nu, jac_inv, j, phi_j, dphi_j_x, dphi_j_y)
+                  CALL GET_QUAD(i, xi, nu, jac_inv, phi_i, dphi_i_x, dphi_i_y)
+                  CALL GET_QUAD(j, xi, nu, jac_inv, phi_j, dphi_j_x, dphi_j_y)
 
                   elem_mat(i,j) = elem_mat(i,j) + (kappa * (dphi_i_x * dphi_j_x + dphi_i_y * dphi_j_y) + m * phi_i * phi_j) * jac_det
 
@@ -248,40 +247,23 @@
 
       END SUBROUTINE
 
-      SUBROUTINE GET_QUAD(xi, nu, jac_inv, basis, phi, dphi_x, dphi_y)
+      SUBROUTINE GET_QUAD(basis_num, xi, nu, jac_inv, phi, dphi_x, dphi_y)
+            INTEGER, INTENT(IN) :: basis_num
             REAL*8, INTENT(IN) :: xi, nu
             REAL*8, DIMENSION(2,2), INTENT(IN) :: jac_inv
-            INTEGER, INTENT(IN) :: basis
 
             REAL*8, INTENT(OUT) :: phi, dphi_x, dphi_y
             REAL*8 :: dphi_xi, dphi_nu
 
-            IF (basis == 1) THEN
-                  phi = (1 - xi) * (1 - nu) / 4.0
-                  dphi_xi = -(1 - nu) / 4.0
-                  dphi_nu = -(1 - xi) / 4.0
-                  
-            ELSE IF (basis == 2) THEN
-                  phi = (1 - xi) * (1 + nu) / 4.0
-                  dphi_xi = -(1 + nu) / 4.0
-                  dphi_nu = (1 - xi) / 4.0
-
-            ELSE IF (basis == 3) THEN
-                  phi = (1 + xi) * (1 + nu) / 4.0
-                  dphi_xi = (1 + nu) / 4.0
-                  dphi_nu = (1 + xi) / 4.0
-
-            ELSE
-                  phi = (1 + xi) * (1 - nu) / 4.0
-                  dphi_xi = (1 - nu) / 4.0
-                  dphi_nu = -(1 + xi) / 4.0
-
-            END IF
+            CALL PHI_RECT(basis_num, xi, nu, phi)
+            CALL XI_DERIV(basis_num, nu, dphi_xi)
+            CALL NU_DERIV(basis_num, xi, dphi_nu)
 
             dphi_x = jac_inv(1,1) * dphi_xi + jac_inv(1,2) * dphi_nu
             dphi_y = jac_inv(2,1) * dphi_xi + jac_inv(2,2) * dphi_nu
 
       END SUBROUTINE
+
       SUBROUTINE GET_JAC(x, y, xi, nu, jac, jac_inv, jac_det)
             REAL*8, DIMENSION(4), INTENT(IN) :: x, y
             REAL*8, INTENT(IN) :: xi, nu
@@ -330,13 +312,13 @@
                   dphidxi = -(1 - nu) / 4.0
 
             ELSE IF (basis_num == 2) THEN
-                  dphidxi = -(1 + nu) / 4.0
+                  dphidxi = (1 - nu) / 4.0
 
             ELSE IF (basis_num == 3) THEN
                   dphidxi = (1 + nu) / 4.0
                   
             ELSE
-                  dphidxi = (1 - nu) / 4.0
+                  dphidxi = -(1 + nu) / 4.0
 
             END IF
 
@@ -351,13 +333,34 @@
                   dphidnu = -(1 - xi) / 4.0
 
             ELSE IF (basis_num == 2) THEN
-                  dphidnu = (1 - xi) / 4.0
+                  dphidnu = -(1 + xi) / 4.0
 
             ELSE IF (basis_num == 3) THEN
                   dphidnu = (1 + xi) / 4.0
                   
             ELSE
-                  dphidnu = -(1 + xi) / 4.0
+                  dphidnu = (1 - xi) / 4.0
+
+            END IF
+
+      END SUBROUTINE
+
+      SUBROUTINE PHI_RECT(basis_num, xi, nu, phi)
+            INTEGER, INTENT(IN) :: basis_num
+            REAL*8, INTENT(IN) :: xi, nu
+            REAL*8, INTENT(OUT) :: phi
+
+            IF (basis_num == 1) THEN
+                  phi = (1 - xi) * (1 - nu) / 4.0
+                  
+            ELSE IF (basis_num == 2) THEN
+                  phi = (1 + xi) * (1 - nu) / 4.0
+
+            ELSE IF (basis_num == 3) THEN
+                  phi = (1 + xi) * (1 + nu) / 4.0
+
+            ELSE
+                  phi = (1 - xi) * (1 + nu) / 4.0
 
             END IF
 

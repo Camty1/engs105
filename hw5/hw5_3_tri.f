@@ -1,5 +1,5 @@
       PROGRAM HW5
-            INTEGER, PARAMETER :: NUM_ELEM=1089, NUM_NODE=969, NUM_BC=64, NUM_MAT=8
+            INTEGER, PARAMETER :: NUM_ELEM=1872, NUM_NODE=969, NUM_BC=64, NUM_MAT=8
 
             INTEGER, DIMENSION(6, NUM_ELEM) :: elem_list_input
             INTEGER, DIMENSION(4, NUM_ELEM) :: elem_list
@@ -36,7 +36,7 @@
 
             INTEGER :: i, j, k, l, bandwidth, width, row, col, new_col, node, prev_node, next_node
 
-            OPEN(1, file="epeltr4.dat")
+            OPEN(1, file="epeltr4_tri.dat")
             READ(1, *) elem_list_input
             CLOSE(1)
             
@@ -48,7 +48,7 @@
             READ(1, *) bc_list_input
             CLOSE(1)
 
-            OPEN(1, file="bpelt4.dat")
+            OPEN(1, file="bpelt4_tri.dat")
             READ(1, *) heat_rate_list_input
             CLOSE(1)
 
