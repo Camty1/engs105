@@ -1,5 +1,6 @@
         PROGRAM HW5
-                INTEGER, PARAMETER :: NUM_ELEM=1089, NUM_NODE=969, NUM_BC=64, NUM_MAT=8
+                INTEGER, PARAMETER :: NUM_ELEM=1872, NUM_NODE=969, NUM_BC=64, NUM_MAT=8, TIMESTEPS=5000
+                REAL*8, PARAMETER :: theta=0.5, dt=1
 
                 INTEGER, DIMENSION(6, NUM_ELEM) :: elem_list_input
                 INTEGER, DIMENSION(4, NUM_ELEM) :: elem_list
@@ -21,21 +22,22 @@
                 REAL*8, DIMENSION(4, NUM_MAT - 2) :: mat_properties_input
                 REAL*8, DIMENSION(3, NUM_MAT) :: mat_properties
 
-                REAL*8, DIMENSION(:,:), ALLOCATABLE :: LHS
-                REAL*8, DIMENSION(NUM_NODE) :: RHS
+                REAL*8, DIMENSION(:,:), ALLOCATABLE :: A_mat, B_mat
+                REAL*8, DIMENSION(NUM_NODE) :: RHS, U
 
                 REAL*8, DIMENSION(3,3) :: elem_mat_3
                 REAL*8, DIMENSION(4,4) :: elem_mat_4
+                REAL*8, DIMENSION(4) :: tri_quad_points
                 REAL*8, DIMENSION(3) :: b_vec_3
                 REAL*8, DIMENSION(4) :: b_vec_4
 
-                REAL*8, DIMENSION(4, NUM_ELEM) :: x_elem, y_elem
+                REAL*8, DIMENSION(4, NUM_ELEM) :: x_elem, y_elem, sigmaE
                 REAL*8, DIMENSION(3) :: dx, dy
-                REAL*8 :: A, kappa, m, h, ta, L1, L2, sigmaE
+                REAL*8 :: A, kappa, m, c_rho
 
-                INTEGER :: i, j, k, l, bandwidth, width, row, col, new_col, node, prev_node, next_node
+                INTEGER :: i, j, k, l, bandwidth, width, row, col, new_col
 
-                OPEN(1, file="epeltr4.dat")
+                OPEN(1, file="epeltr4_tri.dat")
                 READ(1, *) elem_list_input
                 CLOSE(1)
 
@@ -47,7 +49,7 @@
                 READ(1, *) bc_list_input
                 CLOSE(1)
 
-                OPEN(1, file="ppelt4.dat")
+                OPEN(1, file="bpelt4_tri.dat")
                 READ(1, *) heat_rate_list_input
                 CLOSE(1)
 
@@ -99,20 +101,18 @@
 
                 width = 2 * bandwidth + 1
 
-                ALLOCATE(LHS(NUM_NODE, width))
+                ALLOCATE(A_mat(NUM_NODE, width))
+                ALLOCATE(B_mat(NUM_NODE, width))
 
                 DO l=1,NUM_ELEM
                 ! PRINT *,l
                 kappa = mat_properties(1, material_list(l))
+                c_rho = mat_properties(2, material_list(l))
                 m = mat_properties(3, material_list(l))
-                sigmaE = heat_rate_list(l)
-
-                ! Tri
-                IF (elem_list(3,l) == elem_list(4,l)) THEN
 
                 CALL GET_TRI_DELTAS(x_elem(1:3, l), y_elem(1:3, l), dx, dy)
                 CALL GET_TRI_AREA(x_elem(1:3, l), dy, A)
-                CALL ELEMENT_MAT_TRI(dx, dy, A, kappa, m, sigmaE, elem_mat_3, b_vec_3)
+                CALL GET_A_ELEM_TRI(dx, dy, A, c_rho, kappa, m, theta, dt, elem_mat_3)
 
                 DO i=1,3
                 DO j=1,3
@@ -120,96 +120,102 @@
                 row = elem_list(i, l)
                 col = elem_list(j, l)
 
-
                 CALL mode2_index_map(row, col, bandwidth, new_col)
 
-                LHS(row, new_col) = LHS(row, new_col) + elem_mat_3(i,j)
+                A_mat(row, new_col) = A_mat(row, new_col) + elem_mat_3(i,j)
+
+                END DO
                 END DO
 
-                RHS(row) = RHS(row) + b_vec_3(i)
-                END DO
+                CALL GET_B_ELEM_TRI(dx, dy, A, c_rho, kappa, m, theta, dt, elem_mat_3)
 
-                ELSE
-
-                CALL ELEMENT_MAT_RECT(x_elem(:,l), y_elem(:,l), kappa, m, sigmaE, elem_mat_4, b_vec_4)
-
-                DO i=1,4
-                DO j=1,4
-
+                DO i=1,3
+                DO j=1,3
 
                 row = elem_list(i, l)
                 col = elem_list(j, l)
 
                 CALL mode2_index_map(row, col, bandwidth, new_col)
 
-                LHS(row, new_col) = LHS(row, new_col) + elem_mat_4(i,j)
-                END DO
-
-                RHS(row) = RHS(row) + b_vec_4(i)
+                B_mat(row, new_col) = B_mat(row, new_col) + elem_mat_3(i,j)
 
                 END DO
-                END IF
+                END DO
                 END DO
 
-                OPEN(1, file="RHS_3_before.dat")
-                WRITE(1, '( *(g0, ",") )') RHS 
+                OPEN(1, file="output/A_1_tri.dat")
+                DO i=1,NUM_NODE
+                WRITE(1, '( *(g0, ",") )') A_mat(i, :)
+
+                END DO
+                CLOSE(1)
+
+                OPEN(1, file="output/B_1_tri.dat")
+                DO i=1,NUM_NODE
+                WRITE(1, '( *(g0, ",") )') B_mat(i, :)
+
+                END DO
+                CLOSE(1)
 
                 DO i=1,NUM_BC
 
-                node = bc_nodes(i)
-                prev_node = bc_prev_nodes(i)
-                next_node = bc_next_nodes(i)
-                h = bc_h(i)
-                ta = bc_ta(i)
-
-                L1 = sqrt((node_pos(1, node) - node_pos(1, prev_node)) ** 2 + (node_pos(2, node) - node_pos(2, prev_node)) ** 2)
-                L2 = sqrt((node_pos(1, node) - node_pos(1, next_node)) ** 2 + (node_pos(2, node) - node_pos(2, next_node)) ** 2)
-
-                row = node
-                col = node
-
-                CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-                LHS(row, new_col) = LHS(row, new_col) + h / 3.0 * (L1 + L2)
-
-                col = prev_node
-                CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-                LHS(row, new_col) = LHS(row, new_col) + h / 6.0 * L1
-
-                col = next_node
-                CALL MODE2_INDEX_MAP(row, col, bandwidth, new_col)
-                LHS(row, new_col) = LHS(row, new_col) + h / 6.0 * L2
-
-                RHS(row) = RHS(row) + h * ta / 2.0 * (L1 + L2)
+                row = bc_nodes(i)
+                A_mat(row, :) = 0
+                A_mat(row, bandwidth + 1) = 1
 
                 END DO
 
-                OPEN(1, file="output/LHS_3.dat")
-                DO i=1,NUM_NODE
-                WRITE(1, '( *(g0, ",") )') LHS(i, :)
+                CALL DSOLVE(1, A_mat, U, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth+1)
+
+                U = 0
+                OPEN(1, file="output/u_1_tri_dt.dat")
+
+                DO k=1,TIMESTEPS
+
+                WRITE(1, '( *(g0, ",") )') U
+
+                CALL BANDED_MULT_OUTPUT(B_mat, U, NUM_NODE, 2*bandwidth+1, bandwidth, RHS)
+
+                DO l=1,NUM_ELEM
+
+                CALL GET_RHS_ELEM_TRI(A, heat_rate_list(l), b_vec_3)
+                b_vec_3 = b_vec_3 * dt
+                DO i=1,3
+
+                row = elem_list(i,l)
+                RHS(row) = RHS(row) + b_vec_3(i)
 
                 END DO
+                
+                IF (k == 1) THEN
+                        OPEN(2, file="output/RHS_1_tri_dt.dat")
+                        WRITE(2, '( *(g0, "," ) )') RHS
+                        CLOSE(2)
+                END IF
+
+                DO i=1,NUM_BC
+
+                row = bc_nodes(i)
+                RHS(row) = 0
+
+                END DO
+                END DO
+
+                CALL DSOLVE(2, A_mat, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth + 1)
+
+                U = RHS
+                END DO
+
+                WRITE(1, '( *(g0, ",") )') U
                 CLOSE(1)
 
-                OPEN(1, file="output/RHS_3.dat")
-                DO i=1,NUM_NODE
-                WRITE(1, '( *(g0, ",") )') RHS(i)
+                !CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth + 1)
 
-                END DO
-                CLOSE(1)
-
-                CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth + 1)
-
-                OPEN(1, file="output/u_3.dat")
-                DO i=1,NUM_NODE
-                WRITE(1, '( *(g0, ",") )') RHS(i)
-
-                END DO
-                CLOSE(1)
         END PROGRAM
 
         SUBROUTINE ELEMENT_MAT_RECT(x, y, kappa, m, sigmaE, elem_mat, elem_b)
-                REAL*8, DIMENSION(4), INTENT(IN) :: x, y
-                REAL*8, INTENT(IN) :: kappa, m, sigmaE
+                REAL*8, DIMENSION(4), INTENT(IN) :: x, y, sigmaE
+                REAL*8, INTENT(IN) :: kappa, m 
                 REAL*8, DIMENSION(4,4), INTENT(OUT) :: elem_mat
                 REAL*8, DIMENSION(4), INTENT(OUT) :: elem_b
 
@@ -236,18 +242,9 @@
 
                 elem_mat(i,j) = elem_mat(i,j) + (kappa * (dphi_i_x * dphi_j_x + dphi_i_y * dphi_j_y) + m * phi_i * phi_j) * jac_det
 
-                END DO
-                END DO
-                END DO
-                DO i=1,4
-                DO k=1,4
-                xi = quad_points(1, k)
-                nu = quad_points(2, k)
-                CALL GET_JAC(x, y, xi, nu, jac, jac_inv, jac_det)
-                CALL GET_QUAD(xi, nu, jac_inv, i, phi_i, dphi_i_x, dphi_i_y)
-                PRINT *, phi_i
-                elem_b(i) = elem_b(i) + phi_i * sigmaE * jac_det
+                elem_b(i) = elem_b(i) + sigmaE(j) * phi_j * phi_i * jac_det
 
+                END DO
                 END DO
                 END DO
 
@@ -370,8 +367,8 @@
         END SUBROUTINE
 
         SUBROUTINE ELEMENT_MAT_TRI(dx, dy, A, kappa, m, sigmaE, elem_mat, elem_b)
-                REAL*8, DIMENSION(3), INTENT(IN) :: dx, dy
-                REAL*8, INTENT(IN) :: kappa, m, A, sigmaE
+                REAL*8, DIMENSION(3), INTENT(IN) :: dx, dy, sigmaE
+                REAL*8, INTENT(IN) :: kappa, m, A
 
                 REAL*8, DIMENSION(3, 3), INTENT(OUT) :: elem_mat
                 REAL*8, DIMENSION(3), INTENT(OUT) :: elem_b
@@ -391,7 +388,9 @@
                 elem_mat(3,2) = kappa / (4 * A) * (dx(3) * dx(2) + dy(3) * dy(2)) + m * A / 12.0
                 elem_mat(3,3) = kappa / (4 * A) * (dx(3) * dx(3) + dy(3) * dy(3)) + m * A / 6.0
 
-                elem_b = sigmaE * A / 3.0
+                elem_b(1) = (2 * sigmaE(1) + sigmaE(2) + sigmaE(3)) * A / 12.0
+                elem_b(2) = (sigmaE(1) + 2 * sigmaE(2) + sigmaE(3)) * A / 12.0
+                elem_b(3) = (sigmaE(1) + sigmaE(2) + 2 * sigmaE(3)) * A / 12.0 
 
         END SUBROUTINE
 
@@ -400,9 +399,9 @@
                 REAL*8, INTENT(OUT) :: A
 
                 A = 0.5 * (x(1) * dy(1) + x(2) * dy(2) + x(3) * dy(3))
-        END SUBROUTINE
+                END SUBROUTINE
 
-        SUBROUTINE GET_TRI_DELTAS(x, y, dx, dy)
+                SUBROUTINE GET_TRI_DELTAS(x, y, dx, dy)
                 REAL*8, DIMENSION(3), INTENT(IN) :: x, y
                 REAL*8, DIMENSION(3), INTENT(OUT) :: dx, dy
 
@@ -413,5 +412,93 @@
                 dy(1) = y(2) - y(3)
                 dy(2) = y(3) - y(1)
                 dy(3) = y(1) - y(2)
+
+        END SUBROUTINE
+
+        SUBROUTINE GET_M_ELEM_TRI(A, c_rho, M_elem)
+                REAL*8, INTENT(IN) :: A, c_rho
+                REAL*8, DIMENSION(3,3), INTENT(OUT) :: M_elem
+                INTEGER :: i, j
+
+                M_elem = 0
+
+                DO i=1,3
+                DO j=1,3
+
+                IF (i == j) THEN
+                M_elem(i,j) = c_rho * A / 6.0
+                ELSE 
+                M_elem(i,j) = c_rho * A / 12.0
+                END IF
+
+                END DO
+                END DO
+
+        END SUBROUTINE
+
+        SUBROUTINE GET_K_ELEM_TRI(dx, dy, A, kappa, m, K_elem)
+                REAL*8, DIMENSION(3), INTENT(IN) :: dx, dy
+                REAL*8, INTENT(IN) :: A, kappa, m 
+                REAL*8, DIMENSION(3,3), INTENT(OUT) :: K_elem
+                INTEGER :: i, j
+
+                K_elem = 0
+
+                DO i=1,3
+                DO j=1,3
+
+                K_elem(i,j) = kappa * (dx(i) * dx(j) + dy(i) * dy(j)) / (4 * A)
+
+                IF (i == j) THEN
+                K_elem(i,j) = K_elem(i,j) + m * A / 6.0
+
+                ELSE 
+                K_elem(i,j) = K_elem(i,j) + m * A / 12.0
+
+                END IF
+
+                END DO
+                END DO
+
+        END SUBROUTINE
+
+        SUBROUTINE GET_A_ELEM_TRI(dx, dy, A, c_rho, kappa, m, theta, dt, A_elem)
+                REAL*8, DIMENSION(3), INTENT(IN) :: dx, dy
+                REAL*8, INTENT(IN) :: A, c_rho, kappa, m, theta, dt
+                REAL*8, DIMENSION(3,3), INTENT(OUT) :: A_elem
+
+                REAL*8, DIMENSION(3,3) :: temp_mat
+
+                CALL GET_M_ELEM_TRI(A, c_rho, temp_mat)
+                A_elem = temp_mat
+
+                CALL GET_K_ELEM_TRI(dx, dy, A, kappa, m, temp_mat)
+                A_elem = A_elem + theta * dt * temp_mat
+
+        END SUBROUTINE
+
+        SUBROUTINE GET_B_ELEM_TRI(dx, dy, A, c_rho, kappa, m, theta, dt, B_elem)
+                REAL*8, DIMENSION(3), INTENT(IN) :: dx, dy
+                REAL*8, INTENT(IN) :: A, c_rho, kappa, m, theta, dt
+                REAL*8, DIMENSION(3,3), INTENT(OUT) :: B_elem
+
+                REAL*8, DIMENSION(3,3) :: temp_mat
+
+                CALL GET_M_ELEM_TRI(A, c_rho, temp_mat)
+                B_elem = temp_mat
+
+                CALL GET_K_ELEM_TRI(dx, dy, A, kappa, m, temp_mat)
+                B_elem = B_elem - (1 - theta) * dt * temp_mat
+
+        END SUBROUTINE
+
+        SUBROUTINE GET_RHS_ELEM_TRI(A, sigmaE, rhs_elem)
+                REAL*8, INTENT(IN) :: A
+                REAL*8, INTENT(IN) :: sigmaE
+                REAL*8, DIMENSION(3), INTENT(OUT) :: rhs_elem
+
+                INTEGER :: i
+
+                rhs_elem = sigmaE * A / 3.0
 
         END SUBROUTINE
