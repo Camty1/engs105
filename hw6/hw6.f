@@ -1,8 +1,8 @@
         PROGRAM hw6
                 INTEGER, PARAMETER :: NUM_INPUT_NODE=505, NUM_NODE=502, NUM_ELEM=917, NUM_BC=33, SOURCE_ELEM=288, SINK_ELEM=278
                 REAL*8, PARAMETER :: CURRENT_COEFF=1.0, REMOVE_FACTOR=0.5
-                REAL*8, DIMENSION(:, :), ALLOCATABLE :: LHS
-                REAL*8, DIMENSION(NUM_NODE) :: RHS
+                REAL*8, DIMENSION(:, :), ALLOCATABLE :: LHS, LHS_lapack
+                REAL*8, DIMENSION(NUM_NODE) :: RHS, RHS_lapack
                 REAL*8, DIMENSION(NUM_ELEM, 2) :: current
 
                 INTEGER, DIMENSION(5, NUM_ELEM) :: elem_input
@@ -67,6 +67,7 @@
                 END DO
 
                 ALLOCATE(LHS(NUM_NODE, 2 * bandwidth + 1))
+                ALLOCATE(LHS_lapack(3 * bandwidth + 1, NUM_NODE))
 
                 LHS = 0.0
                 RHS = 0.0
@@ -112,6 +113,12 @@
                         RHS(row) = bc(2, l)
 
                 END DO
+
+                LHS_lapack = 0
+
+                DO i=1,2*bandwidth + 1
+                        LHS_lapack(3 * bandwidth + 2 - i, :) = LHS(:, i)
+                END DO
                 
                 OPEN(1, file="output/LHS.dat")
                 OPEN(2, file="output/RHS.dat")
@@ -125,6 +132,19 @@
 
                 CLOSE(1)
                 CLOSE(2)
+                
+
+                OPEN(1, file="output/LHS_lapack.dat")
+
+                DO i=1,3*bandwidth+1
+
+                        WRITE(1, '( *(g0, ",") )') LHS_lapack(i, :)
+
+                END DO
+
+                CLOSE(1)
+
+                RHS_lapack = RHS
 
                 CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2 * bandwidth + 1)
 
@@ -141,10 +161,41 @@
                 current = 0
 
                 OPEN(1, file="output/i.dat")
+
                 DO l=1,NUM_ELEM
                 DO i=1,3        
                         current(l, 1) = current(l, 1) - RHS(elem_list(i, l)) * dy(i, l) / A(l)
                         current(l, 2) = current(l, 2) + RHS(elem_list(i, l)) * dx(i, l) / A(l)
+
+                END DO
+
+                        WRITE (1, '( *(g0, ",") )') current(l,:)
+
+                END DO
+
+                CLOSE(1)
+
+
+                CALL CAM_DSOLVE(bandwidth, LHS_lapack, RHS_lapack, NUM_NODE)
+
+                OPEN(1, file="output/u_lapack.dat")
+
+                DO i=1,NUM_NODE
+
+                        WRITE(1, '( *(g0, ",") )') RHS_lapack(i)
+
+                END DO
+
+                CLOSE(1)
+
+                current = 0
+
+                OPEN(1, file="output/i_lapack.dat")
+
+                DO l=1,NUM_ELEM
+                DO i=1,3        
+                        current(l, 1) = current(l, 1) - RHS_lapack(elem_list(i, l)) * dy(i, l) / A(l)
+                        current(l, 2) = current(l, 2) + RHS_lapack(elem_list(i, l)) * dx(i, l) / A(l)
 
                 END DO
 
@@ -213,5 +264,27 @@
                         A = A + x(i) * dy(i)
 
                 END DO
+
+        END SUBROUTINE
+
+        SUBROUTINE CAM_DSOLVE(BWIDTH, LHS, RHS, NUM_EQN)
+                INTEGER, INTENT(IN) :: NUM_EQN, BWIDTH
+                REAL*8, DIMENSION(3*BWIDTH+1, NUM_EQN), INTENT(IN) :: LHS
+                REAL*8, DIMENSION(NUM_EQN), INTENT(INOUT) :: RHS
+
+                INTEGER, DIMENSION(NUM_EQN) :: IPIV
+                INTEGER :: INFO
+
+                CALL DGBTRF(NUM_EQN, NUM_EQN, BWIDTH, BWIDTH, LHS, 3 * BWIDTH + 1, IPIV, INFO)
+
+                IF (INFO .NE. 0) THEN
+                        PRINT *, "Error with factorization"
+                ELSE
+                        CALL DGBTRS('N', NUM_EQN, BWIDTH, BWIDTH, 1, LHS, 3 * BWIDTH + 1, IPIV, RHS, NUM_EQN, INFO)
+                
+                        IF (INFO .NE. 0) THEN
+                                PRINT *, "Error with solve"
+                        END IF
+                END IF 
 
         END SUBROUTINE
