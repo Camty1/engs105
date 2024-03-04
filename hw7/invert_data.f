@@ -32,6 +32,10 @@
                 READ(1, *) cov_b
                 CLOSE(1)
 
+                OPEN(1, file="output/d.dat")
+                READ(1, *) d
+                CLOSE(1)
+
                 CALL DGBTRF(NUM_NODE, NUM_NODE, BANDWIDTH, BANDWIDTH, K, 3 * BANDWIDTH + 1, IPIV, INFO)
 
                 IF (INFO .NE. 0) THEN
