@@ -20,30 +20,43 @@ bcs = bcs(:,1);
 %% Covariance Calcs
 LHS_packed = readmatrix("output/LHS.dat");
 LHS = packed2unpacked_coeff(LHS_packed);
+LHS_inv = LHS^-1;
+LHS_inv_trans = LHS_inv';
 RHS = readmatrix("output/RHS.dat");
 
 noise = zeros(length(RHS), 3);
 point_source = readmatrix("point_source_local_coords.txt");
+correlation_lengths = [0, 2, 5];
 
-cov_mat_error = zeros(502, 502, 3);
-cov_mat_potential = zeros(502, 502, 4);
+cov_mat_error = zeros(502, 502, 5);
+cov_mat_potential = zeros(502, 502, 6);
 
 for i=1:3
 	node = elements(288,i);
-	noise(node, 1) = RHS(i) * 0.5;
+	noise(node, 1) = RHS(node) * 0.5;
 end
+
+cov_mat_error(:, :, 1) = cov_mat_error(:,:,1) + diag(noise(:,1).^2);
 
 noise(492, 2) = abs(RHS(492) * 0.4);
 noise(493, 2) = abs(RHS(493) * 0.4);
 
+cov_mat_error(:, :, 2) = cov_mat_error(:, :, 2) + diag(noise(:,2).^2);
+
 for i=1:length(bcs)
-	bc = bcs(i);
-	noise(bc, 3) = 0.5;
+	for j=i:length(bcs)
+		for k=1:length(correlation_lengths)
+			cov_mat_error(bcs(i), bcs(j), 2 + k) = context_length_erm(i, j, correlation_lengths(k), 0.5, bcs, nodes);
+			cov_mat_error(bcs(j), bcs(i), 2 + k) = cov_mat_error(bcs(i), bcs(j), 2 + k);
+		end
+	end
 end
 
-inverse_noise = LHS \ noise;
-inverse_noise(:, 4) = sum(inverse_noise,2);
-cov_diag = sqrt(inverse_noise .^ 2);
+cov_mat_error(:, :, 6) = cov_mat_error(:, :, 1) + cov_mat_error(:, :, 2) + cov_mat_error(:, :, 4);
+
+for i=1:6
+	cov_mat_potential(:, :, i) = LHS_inv * cov_mat_error(:, :, i) * LHS_inv_trans;
+end
 
 for l=1:length(elements)
 	for i=1:3
@@ -83,19 +96,18 @@ legend("Location", "northwest");
 axis equal;
 
 figure(3);
-patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', cov_diag(:,1), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 1))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
 hold on;
 plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
 plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
 colorbar;
-clim([0 max(cov_diag(:, 4))]);
 axis equal;
 title("Map of Error Covariance Diagonal Scenario 1");
 xlabel("x");
 ylabel("y");
 
 figure(4);
-patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', cov_diag(:,2), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 2))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
 hold on;
 plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
 plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
@@ -106,25 +118,55 @@ xlabel("x");
 ylabel("y");
 
 figure(5);
-patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', cov_diag(:,3), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 3))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
 hold on;
 plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
 plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
 colorbar;
-clim([0 max(cov_diag(:, 4))]);
 axis equal;
-title("Map of Error Covariance Diagonal Scenario 3");
+title("Map of Error Covariance Diagonal Scenario 3, l = 0");
 xlabel("x");
 ylabel("y");
 
 figure(6);
-patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', cov_diag(:,4), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 4))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
 hold on;
 plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
 plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
 colorbar;
-clim([0 max(cov_diag(:, 4))]);
+axis equal;
+title("Map of Error Covariance Diagonal Scenario 3, l = 2");
+xlabel("x");
+ylabel("y");
+
+figure(7);
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 5))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+hold on;
+plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
+plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
+colorbar;
+axis equal;
+title("Map of Error Covariance Diagonal Scenario 3, l = 5");
+xlabel("x");
+ylabel("y");
+
+figure(8);
+patch('Faces', elements, 'Vertices', nodes, 'FaceVertexCData', sqrt(diag(cov_mat_potential(:, :, 6))), 'FaceColor', 'interp', 'EdgeAlpha', 0.1, 'DisplayName', 'Potential');
+hold on;
+plot(source_node(1), source_node(2), 'ko', 'MarkerFaceColor', 'red', 'DisplayName', 'Current Source');
+plot(nodes(492:493, 1), nodes(492:493, 2), "Color", 'red', 'LineWidth', 1.5, 'DisplayName', 'Current Sink');
+colorbar;
 axis equal;
 title("Map of Error Covariance Diagonal Combined");
 xlabel("x");
 ylabel("y");
+
+function correlation = context_length_erm(i, j, l, sigma, bcs, nodes)
+delta = (nodes(bcs(j), :) - nodes(bcs(i), :)).^2;
+dist = sqrt(sum(delta));
+correlation = sigma^2;
+
+if (l ~= 0)
+	correlation = sigma^2 * (1 + dist / l) * exp(-dist / l);
+end
+end

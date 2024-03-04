@@ -17,7 +17,7 @@
                         b(i) = i
                 END DO
                 
-                CALL DGBTRF(7, 7, b_width, b_width, A, 3*b_width+1, IPIV, INFO)
+                CALL DGBTRF(m, m, b_width, b_width, A, 3*b_width+1, IPIV, INFO)
                 PRINT *, INFO
 
                 CALL DGBTRS('N', m, b_width, b_width, 1, A, 3*b_width+1, IPIV, b, m, INFO)

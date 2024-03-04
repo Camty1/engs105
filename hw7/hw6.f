@@ -1,5 +1,5 @@
         PROGRAM hw6
-                INTEGER, PARAMETER :: NUM_INPUT_NODE=505, NUM_NODE=502, NUM_ELEM=917, NUM_BC=33, SOURCE_ELEM=288
+                INTEGER, PARAMETER :: NUM_INPUT_NODE=505, NUM_NODE=502, NUM_ELEM=917, NUM_BC=33, SOURCE_ELEM=278
                 REAL*8, PARAMETER :: CURRENT_COEFF=1.0, REMOVE_FACTOR=0.5
                 REAL*8, DIMENSION(:, :), ALLOCATABLE :: LHS, LHS_lapack
                 REAL*8, DIMENSION(NUM_NODE) :: RHS, RHS_lapack
@@ -28,7 +28,7 @@
                 
                 elem_list = elem_input(2:4, :)
 
-                OPEN(1, file="hw44_scaled.nod")
+                OPEN(1, file="hw44.nod")
                 READ(1, *) node_input
                 CLOSE(1)
 
@@ -115,88 +115,19 @@
 
                 END DO
 
-                RHS_lapack(:) = RHS(:)
+                RHS_lapack = RHS
 
                 LHS_lapack(bandwidth + 1:3 * bandwidth + 1, :) = TRANSPOSE(LHS)        
-                OPEN(1, file="output/LHS.dat")
-                OPEN(2, file="output/RHS.dat")
-                OPEN(3, file="output/RHS_lapack.dat")
 
-                DO i=1,NUM_NODE
-
-                        WRITE(1, '( *(g0, :, ",") )') LHS(i,:)
-                        WRITE(2, '( *(g0, :, ",") )') RHS(i)
-                        WRITE(3, '( *(g0, :, ",") )') RHS_lapack(i)
-
-                END DO
-
-                CLOSE(1)
-                CLOSE(2)
-                CLOSE(3)
-                
-                OPEN(1, file="output/LHS_lapack.dat")
-
-                DO i=1,3*bandwidth+1
-
-                        WRITE(1, '( *(g0, :, ",") )') LHS_lapack(i, :)
-
-                END DO
-
-                CLOSE(1)
-
-                CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2 * bandwidth + 1)
+                !CALL DSOLVE(3, LHS, RHS, NUM_NODE, bandwidth, NUM_NODE, 2 * bandwidth + 1)
 
                 CALL CAM_DSOLVE(bandwidth, LHS_lapack, RHS_lapack, NUM_NODE)
 
-                OPEN(1, file="output/u.dat")
-
-                DO i=1,NUM_NODE
-
-                        WRITE(1, '( *(g0, ",") )') RHS(i)
-
-                END DO
-
-                CLOSE(1)
-
-                current = 0
-
-                OPEN(1, file="output/i.dat")
-
-                DO l=1,NUM_ELEM
-                DO i=1,3        
-                        current(l, 1) = current(l, 1) - RHS(elem_list(i, l)) * dy(i, l) / A(l)
-                        current(l, 2) = current(l, 2) + RHS(elem_list(i, l)) * dx(i, l) / A(l)
-
-                END DO
-
-                        WRITE (1, '( *(g0, ",") )') current(l,:)
-
-                END DO
-
-                CLOSE(1)
-
-                OPEN(1, file="output/u_lapack.dat")
+                OPEN(1, file="truth.dat")
 
                 DO i=1,NUM_NODE
 
                         WRITE(1, '( *(g0, ",") )') RHS_lapack(i)
-
-                END DO
-
-                CLOSE(1)
-
-                current = 0
-
-                OPEN(1, file="output/i_lapack.dat")
-
-                DO l=1,NUM_ELEM
-                DO i=1,3        
-                        current(l, 1) = current(l, 1) - RHS_lapack(elem_list(i, l)) * dy(i, l) / A(l)
-                        current(l, 2) = current(l, 2) + RHS_lapack(elem_list(i, l)) * dx(i, l) / A(l)
-
-                END DO
-
-                        WRITE (1, '( *(g0, ",") )') current(l,:)
 
                 END DO
 
