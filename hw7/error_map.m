@@ -1,5 +1,6 @@
 SAVE = true;
 NUM_NODE = 502;
+NUM_MEAS = 12;
 
 u_truth = readmatrix("output/truth.dat");
 u_fit = readmatrix("output/u_fit.dat")';
@@ -49,9 +50,15 @@ plot3(sample_points(:,1), sample_points(:,2), ones(NUM_MEAS, 1) * max(u_fit), 'r
 hold off;
 legend("Fit Potential", "Sample Points");
 
-figs{end+1} = FEM_patch(elements, nodes, source, "Source Distribution Contour Plot");
+figs{end+1} = FEM_patch(elements, nodes, source, "Fit Source Distribution Contour Plot");
 hold on;
 plot3(sample_points(:,1), sample_points(:,2), ones(NUM_MEAS, 1) * max(source), 'r.');
+hold off;
+legend("Source Distribution", "Sample Points");
+
+figs{end+1} = FEM_patch(elements, nodes, b_truth, "Truth Source Distribution Contour Plot");
+hold on;
+plot3(sample_points(:,1), sample_points(:,2), ones(NUM_MEAS, 1) * max(b_truth), 'r.');
 hold off;
 legend("Source Distribution", "Sample Points");
 
