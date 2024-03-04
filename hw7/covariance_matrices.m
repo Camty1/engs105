@@ -34,6 +34,9 @@ for i=1:num_grounds
 		cov_ground(ground(i), ground(j)) = context_length_erm(i, j, l_ground, sigma_ground, nodes, ground);
 		cov_ground(ground(j), ground(i)) = cov_ground(ground(i), ground(j));
 	end
+	
+	cov_source(ground(i), :) = 0;
+	cov_source(:, ground(i)) = 0;
 end
 
 cov_b = cov_ground + cov_source;

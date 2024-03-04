@@ -139,6 +139,10 @@
 
                 CLOSE(1)
 
+                OPEN(1, file="output/RHS.dat")
+                WRITE(1, '( *(g0, ",") )') RHS
+                CLOSE(1)
+
                 CALL CAM_DSOLVE(bandwidth, LHS_lapack, RHS_lapack, NUM_NODE)
 
                 OPEN(1, file="output/truth.dat")

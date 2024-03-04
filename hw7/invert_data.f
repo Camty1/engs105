@@ -72,6 +72,22 @@
 
                 END DO
 
+                OPEN(1, file="output/R_plus_I.dat")
+                
+                DO i=1,NUM_MEAS
+                        WRITE(1, '( *(g0, ",") )') R(i,:)
+                END DO
+
+                CLOSE(1)
+
+                OPEN(1, file="output/u_mat.dat")
+
+                DO i=1,NUM_NODE
+                        WRITE(1, '( *(g0, ",") )') u_mat(i, :)
+                END DO
+
+                CLOSE(1)
+
                 CALL DGETRF(NUM_MEAS, NUM_MEAS, R, NUM_MEAS, IPIV_R, INFO)
 
                 IF (INFO .NE. 0) THEN
