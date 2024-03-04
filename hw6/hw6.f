@@ -262,6 +262,8 @@
 
                 END DO
 
+                A = A / 2.0
+
         END SUBROUTINE
 
         SUBROUTINE CAM_DSOLVE(BWIDTH, LHS, RHS, NUM_EQN)
