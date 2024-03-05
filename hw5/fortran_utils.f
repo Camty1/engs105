@@ -1,8 +1,15 @@
-        SUBROUTINE MODE2_INDEX_MAP(row, col, width, new_col)
+        SUBROUTINE MODE_2_INDEX_MAP(row, col, width, new_col)
                 INTEGER, INTENT(IN) :: row, col, width
                 INTEGER, INTENT(OUT) :: new_col
 
                 new_col = (width + 1) + (col-row)
+        END SUBROUTINE
+
+        SUBROUTINE LAPACK_INDEX_MAP(row, col, width, new_row)
+                INTEGER, INTENT(IN) :: row, col, width
+                INTEGER, INTENT(OUT) :: new_row
+
+                new_row = (2*width+1) + (col-row)
         END SUBROUTINE
 
         SUBROUTINE LINSPACE(x_min, x_max, num_points, arr)
