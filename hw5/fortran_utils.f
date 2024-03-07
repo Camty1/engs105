@@ -3,13 +3,16 @@
                 INTEGER, INTENT(OUT) :: new_col
 
                 new_col = (width + 1) + (col-row)
+
         END SUBROUTINE
 
-        SUBROUTINE LAPACK_INDEX_MAP(row, col, width, new_row)
+        SUBROUTINE LAPACK_INDEX_MAP(row, col, width, new_row, new_col)
                 INTEGER, INTENT(IN) :: row, col, width
                 INTEGER, INTENT(OUT) :: new_row
 
                 new_row = (2*width+1) + (col-row)
+                new_col = row
+
         END SUBROUTINE
 
         SUBROUTINE LINSPACE(x_min, x_max, num_points, arr)
@@ -22,6 +25,7 @@
                         arr(i) = (i-1) * (x_max-x_min)/(num_points-1)
                         arr(i) = arr(i) + x_min
                 END DO
+
         END SUBROUTINE
 
         SUBROUTINE POLAR_2_CART(r, theta, x, y)
@@ -30,4 +34,5 @@
 
                 x = r * COS(theta)
                 y = r * SIN(theta)
+
         END SUBROUTINE 
