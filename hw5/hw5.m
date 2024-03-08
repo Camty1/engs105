@@ -1,4 +1,4 @@
-SAVE = false;
+SAVE = true;
 
 elem = readmatrix("epeltr4.dat");
 elem_type = elem(:, 6);
@@ -54,10 +54,10 @@ plot3(node(boundary_nodes, 1), node(boundary_nodes, 2), ones(size(boundary_nodes
 legend("Temperature", ['Tumor, T_{AVG} = ' num2str(modified_tumor_temp) char(176) 'C']);
 hold off;
 
-FEM_patch(elem, node, u_transient(:,end));
+[bingo, bongo] = animated_FEM_patch(elem, node, u_transient, "Baseline Temperature Transient");
 
 if SAVE
 	for i=1:length(figs)
-		saveas(figs{i}, regexprep(lower(['figures/' figs{i}.Name '.png']), ' ', '_'));
+		saveas(figs{i}, regexprep(lower(['./figures/' figs{i}.Name '.png']), ' ', '_'));
 	end
 end

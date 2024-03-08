@@ -1,6 +1,6 @@
         PROGRAM transient
                 INTEGER, PARAMETER :: NUM_NODE=969, NUM_ELEM=1089, NUM_BC=64, NUM_MAT=8, NUM_STEPS=1000
-                REAL*8, PARAMETER :: dt=0.01, theta=0.5
+                REAL*8, PARAMETER :: dt=50, theta=0.5
                 REAL*8, DIMENSION(3, NUM_NODE) :: node_input
                 REAL*8, DIMENSION(2, NUM_NODE) :: node
 
@@ -226,6 +226,20 @@
                         WRITE(1, '(*(g0, ","))') u(:, k)
 
                 END DO
+                CLOSE(1)
+
+                RHS = RHS_cpy / dt
+
+                CALL DSOLVE(3, A_packed, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth+1)
+
+                OPEN(1, file="output/u_test.dat")
+
+                DO i=1,NUM_NODE
+
+                        WRITE(1, '(*(g0, ","))') RHS(i)
+
+                END DO
+
                 CLOSE(1)
 
         END PROGRAM
