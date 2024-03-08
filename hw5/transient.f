@@ -1,5 +1,6 @@
-        PROGRAM steady_state
-                INTEGER, PARAMETER :: NUM_NODE=969, NUM_ELEM=1089, NUM_BC=64, NUM_MAT=8
+        PROGRAM transient
+                INTEGER, PARAMETER :: NUM_NODE=969, NUM_ELEM=1089, NUM_BC=64, NUM_MAT=8, NUM_STEPS=1000
+                REAL*8, PARAMETER :: dt=0.01, theta=0.5
                 REAL*8, DIMENSION(3, NUM_NODE) :: node_input
                 REAL*8, DIMENSION(2, NUM_NODE) :: node
 
@@ -17,20 +18,21 @@
                 INTEGER, DIMENSION(NUM_BC) :: bc_node, bc_next, bc_prev
                 REAL*8, DIMENSION(NUM_BC) :: bc_h, bc_Ta
 
-                REAL*8, DIMENSION(:,:), ALLOCATABLE :: LHS_lapack, LHS_dsolve
-                REAL*8, DIMENSION(NUM_NODE, NUM_NODE) :: LHS_unpacked
-                REAL*8, DIMENSION(NUM_NODE) :: RHS, RHS_lapack
+                REAL*8, DIMENSION(:,:), ALLOCATABLE :: A_packed, M_packed, LHS_mat
+                REAL*8, DIMENSION(NUM_NODE, NUM_NODE) :: A_unpacked, M_unpacked, RHS_mat
+                REAL*8, DIMENSION(NUM_NODE) :: RHS, RHS_cpy
+                REAL*8, DIMENSION(NUM_NODE, NUM_STEPS+1) :: u
 
                 REAL*8, DIMENSION(4, NUM_ELEM) :: x, y
-                REAL*8, DIMENSION(3, 3) :: A_3
+                REAL*8, DIMENSION(3, 3) :: A_3, M_3
                 REAL*8, DIMENSION(3) :: b_3
-                REAL*8, DIMENSION(4, 4) :: A_4
+                REAL*8, DIMENSION(4, 4) :: A_4, M_4
                 REAL*8, DIMENSION(4) :: b_4
 
                 INTEGER, DIMENSION(NUM_NODE) :: IPIV
                 INTEGER :: INFO
 
-                REAL*8 :: kappa, m, h, Ta, L1, L2
+                REAL*8 :: kappa, m, rho, h, Ta, L1, L2
                 INTEGER :: i, j, k, l, width, bandwidth
                 INTEGER :: row, col, new_row, new_col, first3, first4
 
@@ -66,11 +68,7 @@
                 bc_h = bc_input(6, :)
                 bc_Ta = bc_input(7, :)
 
-                OPEN(1, file="bc_node.dat")
-                WRITE(1, '( *(g0, ",") )') bc_node
-                CLOSE(1)
-
-                OPEN(1, file="modified_material_properties.dat")
+                OPEN(1, file="material_properties.dat")
                 READ(1, *) material_input
                 CLOSE(1)
 
@@ -96,42 +94,37 @@
                 END DO
                 END DO
 
-                ALLOCATE(LHS_lapack(3*bandwidth+1, NUM_NODE))
-                ALLOCATE(LHS_dsolve(NUM_NODE, 2*bandwidth+1))
-                LHS_lapack = 0
-                LHS_dsolve = 0
-                LHS_unpacked = 0
+                ALLOCATE(A_packed(NUM_NODE, 2*bandwidth+1))
+                ALLOCATE(M_packed(NUM_NODE, 2*bandwidth+1))
+                ALLOCATE(LHS_mat(NUM_NODE, 2*bandwidth+1))
+                A_packed = 0
+                M_packed = 0
+                A_unpacked = 0
+                M_unpacked = 0
                 RHS = 0
 
                 DO l=1,NUM_ELEM
 
                 kappa = material(1, elem_material(l))
+                rho = material(2, elem_material(l))
                 m = material(3, elem_material(l))
 
                 IF (elem(3, l) == elem(4, l)) THEN
 
-                        CALL ELEM_MAT_3(x(1:3, l), y(1:3, l), kappa, m, sigma(l), A_3, b_3)
+                        CALL ELEM_MAT_3(x(1:3, l), y(1:3, l), kappa, m, rho, sigma(l), A_3, M_3, b_3)
 
-                        IF (first3 == 0) THEN
-                                OPEN(1, file="output/3.dat")
-                                DO i=1,3
-                                        WRITE(1,'(*(g0, ","))') A_3(i,:), b_3(i)
-                                END DO
-                                CLOSE(1)
-                                first3 = 1
-                        END IF
                 DO i=1,3
                 DO j=1,3
 
                         row = elem(i, l)
                         col = elem(j, l)
-                        CALL LAPACK_INDEX_MAP(row, col, bandwidth, new_row, new_col)
 
-                        LHS_unpacked(row, col) = LHS_unpacked(row, col) + A_3(i, j) 
-                        LHS_lapack(new_row, new_col) = LHS_lapack(new_row, new_col) + A_3(i, j)
+                        A_unpacked(row, col) = A_unpacked(row, col) + A_3(i, j) 
+                        M_unpacked(row, col) = M_unpacked(row, col) + M_3(i, j)
 
                         CALL MODE_2_INDEX_MAP(row, col, bandwidth, new_col)
-                        LHS_dsolve(row, new_col) = LHS_dsolve(row, new_col) + A_3(i, j)
+                        A_packed(row, new_col) = A_packed(row, new_col) + A_3(i, j)
+                        M_packed(row, new_col) = M_packed(row, new_col) + M_3(i, j)
 
                 END DO
                 END DO
@@ -145,28 +138,20 @@
 
                 ELSE
 
-                        CALL ELEM_MAT_4(x(:, l), y(:, l), kappa, m, sigma(l), A_4, b_4)
+                        CALL ELEM_MAT_4(x(:, l), y(:, l), kappa, m, rho, sigma(l), A_4, M_4, b_4)
 
-                        IF (first4 == 0) THEN
-                                OPEN(1, file="output/4.dat")
-                                DO i=1,4
-                                        WRITE(1,'(*(g0, ","))') A_4(i,:), b_4(i)
-                                END DO
-                                CLOSE(1)
-                                first4 = 1
-                        END IF
                 DO i=1,4
                 DO j=1,4
 
                         row = elem(i, l)
                         col = elem(j, l)
-                        CALL LAPACK_INDEX_MAP(row, col, bandwidth, new_row, new_col)
 
-                        LHS_unpacked(row, col) = LHS_unpacked(row, col) + A_4(i, j)
-                        LHS_lapack(new_row, new_col) = LHS_lapack(new_row, new_col) + A_4(i, j)
+                        A_unpacked(row, col) = A_unpacked(row, col) + A_4(i, j)
+                        M_unpacked(row, col) = M_unpacked(row, col) + M_4(i, j)
 
                         CALL MODE_2_INDEX_MAP(row, col, bandwidth, new_col)
-                        LHS_dsolve(row, new_col) = LHS_dsolve(row, new_col) + A_4(i, j)
+                        A_packed(row, new_col) = A_packed(row, new_col) + A_4(i, j)
+                        M_packed(row, new_col) = M_packed(row, new_col) + M_4(i, j)
 
                 END DO
                 END DO
@@ -196,86 +181,64 @@
 
                         CALL MODE_2_INDEX_MAP(row, col, bandwidth, new_col)
 
-                        LHS_dsolve(row, new_col) = LHS_dsolve(row, new_col) + h * (L1 + L2) / 3.0
-                        LHS_unpacked(row, col) = LHS_unpacked(row, col) + h * (L1 + L2) / 3.0
-
-                        CALL LAPACK_INDEX_MAP(row, col, bandwidth, new_row, new_col)
-
-                        LHS_lapack(new_row, new_col) = LHS_lapack(new_row, new_col)+ h * (L1 + L2) / 3.0
+                        A_packed(row, new_col) = A_packed(row, new_col) + h * (L1 + L2) / 3.0
+                        A_unpacked(row, col) = A_unpacked(row, col) + h * (L1 + L2) / 3.0
 
                         col = bc_prev(i)
 
                         CALL MODE_2_INDEX_MAP(row, col, bandwidth, new_col)
 
-                        LHS_dsolve(row, new_col) = LHS_dsolve(row, new_col) + h * L1 / 6.0
-                        LHS_unpacked(row, col) = LHS_unpacked(row, col) + h * L1 / 6.0
-
-                        CALL LAPACK_INDEX_MAP(row, col, bandwidth, new_row, new_col)
-
-                        LHS_lapack(new_row, new_col) = LHS_lapack(new_row, new_col)+ h * L1 / 6.0
+                        A_packed(row, new_col) = A_packed(row, new_col) + h * L1 / 6.0
+                        A_unpacked(row, col) = A_unpacked(row, col) + h * L1 / 6.0
 
                         col = bc_next(i)
 
                         CALL MODE_2_INDEX_MAP(row, col, bandwidth, new_col)
 
-                        LHS_dsolve(row, new_col) = LHS_dsolve(row, new_col) + h * L2 / 6.0
-                        LHS_unpacked(row, col) = LHS_unpacked(row, col) + h * L2 / 6.0
+                        A_packed(row, new_col) = A_packed(row, new_col) + h * L2 / 6.0
+                        A_unpacked(row, col) = A_unpacked(row, col) + h * L2 / 6.0
 
-                        CALL LAPACK_INDEX_MAP(row, col, bandwidth, new_row, new_col)
-
-                        LHS_lapack(new_row, new_col) = LHS_lapack(new_row, new_col) + h * L2 / 6.0
                 END DO
 
-                OPEN(1, file="output/LHS_lapack.dat")
-                DO i=1,3*bandwidth+1
-                        WRITE(1, '(*(g0, ","))') LHS_lapack(i, :)
+                LHS_mat = 0
+                RHS_mat = 0
+                
+                LHS_mat = M_packed + theta * dt * A_packed
+                RHS_mat = M_unpacked - (1 - theta) * dt * A_unpacked
+                RHS = RHS * dt
+                RHS_cpy = RHS
+
+                CALL DSOLVE(1, LHS_mat, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth+1)
+
+                DO k=1,NUM_STEPS
+
+                        RHS = RHS_cpy + MATMUL(RHS_mat, u(:, k))
+
+                        CALL DSOLVE(2, LHS_mat, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwith+1)
+
+                        u(:, k+1) = RHS
+
                 END DO
-                CLOSE(1)
 
-                OPEN(1, file="output/LHS_unpacked.dat")
-                OPEN(2, file="output/RHS.dat")
-                OPEN(3, file="output/LHS_dsolve.dat")
-                DO i=1,NUM_NODE
-                        WRITE(1, '(*(g0, ","))') LHS_unpacked(i, :)
-                        WRITE(2, '(*(g0, ","))') RHS(i)
-                        WRITE(3, '(*(g0, ","))') LHS_dsolve(i, :)
-                END DO
-                CLOSE(1)
-                CLOSE(2)
-                CLOSE(3)
+                OPEN(1, file="output/u_transient.dat")
+                DO k=1,NUM_STEPS+1
 
-                CALL DGBTRF(NUM_NODE, NUM_NODE, bandwidth, bandwidth, LHS_lapack, 3 * bandwidth + 1, IPIV, INFO)
+                        WRITE(1, '(*(g0, ","))') u(:, k)
 
-                IF (INFO .NE. 0) THEN
-                        PRINT *, "Error with matrix factorization"
-                END IF
-                RHS_lapack = RHS
-                CALL DGBTRS('N', NUM_NODE, bandwidth, bandwidth, 1, LHS_lapack, 3*bandwidth+1, IPIV, RHS_lapack, NUM_NODE, INFO)
-
-                CALL DSOLVE(3, LHS_dsolve, RHS, NUM_NODE, bandwidth, NUM_NODE, 2*bandwidth+1)
-
-                OPEN(1, file="output/u_lapack.dat")
-                OPEN(2, file="output/u_dsolve.dat")
-                DO i=1,NUM_NODE
-                        WRITE(1, '(*(g0, ","))') RHS_lapack(i)
-                        WRITE(2, '(*(g0, ","))') RHS(i)
                 END DO
                 CLOSE(1)
-                CLOSE(2)
 
         END PROGRAM
 
-        SUBROUTINE ELEM_MAT_3(x, y, kappa, m, sigma, A_3, b_3)
+        SUBROUTINE ELEM_MAT_3(x, y, kappa, m, rho, sigma, A_3, M_3, b_3)
                 REAL*8, DIMENSION(3), INTENT(IN) :: x ,y
-                REAL*8, INTENT(IN) :: kappa, m, sigma
-                REAL*8, DIMENSION(3,3), INTENT(OUT) :: A_3
+                REAL*8, INTENT(IN) :: kappa, m, rho, sigma
+                REAL*8, DIMENSION(3,3), INTENT(OUT) :: A_3, M_3
                 REAL*8, DIMENSION(3), INTENT(OUT) :: b_3
 
                 REAL*8, DIMENSION(3) :: dx, dy
                 REAL*8 :: A
                 INTEGER :: i, j
-
-                !PRINT *, kappa, m, sigma
 
                 CALL GET_DELTAS(x, y, dx, dy)
                 CALL GET_AREA(x, dy, A)
@@ -287,9 +250,13 @@
 
                         A_3(i, j) = kappa / (4 * A) * (dx(i)*dx(j) + dy(i)*dy(j)) + m * A / 6.0
 
+                        M_3(i, j) = rho * A / 6.0
+
                 ELSE
 
                         A_3(i, j) = kappa / (4 * A) * (dx(i)*dx(j) + dy(i)*dy(j)) + m * A / 12.0
+
+                        M_3(i, j) = rho * A / 12.0
 
                 END IF
 
@@ -301,8 +268,6 @@
                         b_3(i) = sigma * A / 3.0
 
                 END DO
-
-
 
         END SUBROUTINE
 
@@ -336,10 +301,10 @@
 
         END SUBROUTINE
 
-        SUBROUTINE ELEM_MAT_4(x, y, kappa, m, sigma, A_4, b_4)
+        SUBROUTINE ELEM_MAT_4(x, y, kappa, m, rho, sigma, A_4, M_4, b_4)
                 REAL*8, DIMENSION(4), INTENT(IN) :: x, y
-                REAL*8, INTENT(IN) :: kappa, m, sigma
-                REAL*8, DIMENSION(4,4), INTENT(OUT) :: A_4
+                REAL*8, INTENT(IN) :: kappa, m, rho, sigma
+                REAL*8, DIMENSION(4,4), INTENT(OUT) :: A_4, M_4
                 REAL*8, DIMENSION(4), INTENT(OUT) :: b_4
 
                 REAL*8, DIMENSION(4) :: zeta_k, eta_k
@@ -353,6 +318,7 @@
                 eta_k = (/-1, 1, -1, 1/) * 1 / SQRT(3.0)
 
                 A_4 = 0
+                M_4 = 0
                 b_4 = 0
 
                 DO i=1,4
@@ -371,6 +337,8 @@
                         CALL DPHI_GLOBAL(dphi_j_dzeta, dphi_j_deta, dx_dzeta, dx_deta, dy_dzeta, dy_deta, dphi_j_dx, dphi_j_dy, det)
 
                         A_4(i, j) = A_4(i, j) + (kappa * (dphi_i_dx * dphi_j_dx + dphi_i_dy * dphi_j_dy) + m * phi_i * phi_j) * det
+
+                        M_4(i, j) = M_4(i, j) + rho * phi_i * phi_j * det
 
                 END DO
                 END DO
