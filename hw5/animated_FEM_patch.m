@@ -1,4 +1,4 @@
-function [fig, mov] = FEM_patch(elements, nodes, u, plot_title, cmap)
+function fig = FEM_patch(elements, nodes, u, plot_title, cmap)
 fig = figure;
 if nargin < 4
 	plot_title = "Contour Plot";
@@ -39,6 +39,6 @@ for i=2:length(T)
     mov(:, :, 1, i) = rgb2ind(f.cdata, map, 'nodither');
 end
 
-imwrite(mov, map, './figures/u_transient.gif', 'DelayTime', 0, 'LoopCount', inf);
+imwrite(mov, map, regexprep(lower(['./figures/' fig.Name '.gif']), ' ', '_'), 'DelayTime', 0, 'LoopCount', inf);
 
 end

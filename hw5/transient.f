@@ -1,6 +1,6 @@
         PROGRAM transient
-                INTEGER, PARAMETER :: NUM_NODE=969, NUM_ELEM=1089, NUM_BC=64, NUM_MAT=8, NUM_STEPS=1000
-                REAL*8, PARAMETER :: dt=50, theta=0.5
+                INTEGER, PARAMETER :: NUM_NODE=969, NUM_ELEM=1089, NUM_BC=64, NUM_MAT=8, NUM_STEPS=250
+                REAL*8, PARAMETER :: dt=200, theta=0.5
                 REAL*8, DIMENSION(3, NUM_NODE) :: node_input
                 REAL*8, DIMENSION(2, NUM_NODE) :: node
 
