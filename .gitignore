@@ -3,6 +3,9 @@
 !*.*
 !*/
 
+# Add back Makefiles
+!Makefile
+
 # Ignore fotran object and module files
 *.o
 *.mod
